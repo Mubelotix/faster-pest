@@ -2,7 +2,7 @@
 enum ErrorKind {
     ExpectedValue(&'static str),
     Expected(&'static str),
-    Both(Box<Error>, Box<Error>)
+    All(Vec<Error>)
 }
 
 

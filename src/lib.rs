@@ -55,6 +55,15 @@ fn contains_idents(expr: &OptimizedExpr, silent_rules: &[&str]) -> bool {
     }
 }
 
+fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a OptimizedExpr>) {
+    if let OptimizedExpr::Choice(first, second) = expr {
+        choices.push(first);
+        choices.push(second);
+        list_choices(first, choices);
+        list_choices(second, choices);
+    }
+}
+
 trait HackTrait {
     fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str]) -> String;
 }
@@ -188,43 +197,35 @@ impl HackTrait for OptimizedExpr {
                     _ => String::new()
                 }
             }
-            OptimizedExpr::Choice(first, second) => {
-                let first_id = ids.id(first);
-                let first_idents = match contains_idents(first, silent_rules) {
-                    true => "idents",
-                    false => "",
-                };
-                let second_id = ids.id(second);
-                let second_idents = match contains_idents(second, silent_rules) {
-                    true => "idents",
-                    false => "",
-                };
+            OptimizedExpr::Choice(_, _) => {
+                let mut choices = Vec::new();
+                list_choices(self, &mut choices);
+
+                let mut code = String::new();
+                let mut quick_code = String::new();
+                let mut error_code = String::from("let mut errors = Vec::new();\n");
+                for (i, choice) in choices.iter().enumerate() {
+                    let id = ids.id(choice);
+                    let idents = match contains_idents(choice, silent_rules) {
+                        true => "idents",
+                        false => "",
+                    };
+                    let cancel = if i == 0 { cancel1 } else { cancel2 } ;
+                    code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{id}(input, {idents}) {{ return Ok(input); }}\n"));
+                    quick_code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{id}(input, {idents}) {{ return Some(input); }}\n"));
+                    error_code.push_str(&format!("errors.push(parse_{id}(input, {idents}).unwrap_err());\n"));
+                }
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
-                    {cancel1}
-                    if let Some(input) = quick_parse_{first_id}(input, {first_idents}) {{
-                        return Ok(input);
-                    }}
+                    {code}
+                    {error_code}
                     {cancel2}
-                    if let Some(input) = quick_parse_{second_id}(input, {second_idents}) {{
-                        return Ok(input);
-                    }}
-                    let error_first = parse_{first_id}(input, {first_idents}).unwrap_err();
-                    let error_second = parse_{second_id}(input, {second_idents}).unwrap_err();
-                    {cancel2}
-                    Err(Error::new(ErrorKind::Both(Box::new(error_first), Box::new(error_second)), input, "choice {id}"))
+                    Err(Error::new(ErrorKind::All(errors)), input, "choice {id}"))
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                    {cancel1}
-                    if let Some(input) = quick_parse_{first_id}(input, {first_idents}) {{
-                        return Some(input);
-                    }}
-                    {cancel2}
-                    if let Some(input) = quick_parse_{second_id}(input, {second_idents}) {{
-                        return Some(input);
-                    }}
+                    {quick_code}
                     {cancel2}
                     None
                 }}
