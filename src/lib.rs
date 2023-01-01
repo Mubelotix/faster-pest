@@ -70,9 +70,7 @@ impl HackTrait for OptimizedExpr {
                     }}
                     "#)
                 } else {
-                    format!(r#"
-                    IDENT {ident} ({id})
-                    "#)
+                    String::new()
                 }
             }
             OptimizedExpr::Choice(first, second) => {
@@ -94,8 +92,8 @@ impl HackTrait for OptimizedExpr {
             OptimizedExpr::Str(value) => {
                 format!(r#"
                 fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
-                    if input.starts_with("{value}") {{
-                        Ok(&input["{value}".len()..])
+                    if input.starts_with({value:?}) {{
+                        Ok(&input[{value:?}.len()..])
                     }} else {{
                         Err("nope")
                     }}
@@ -131,34 +129,35 @@ impl HackTrait for OptimizedExpr {
 
 #[test]
 fn test() {
-    let grammar = r#"field = { (ASCII_DIGIT | "." | "-")+ }"#;
+    let grammar = r#"field = { (ASCII_DIGIT | "." | "-")+ }
+record = { field ~ ("," ~ field)* }
+file = { SOI ~ (record ~ ("\r\n" | "\n"))* ~ EOI }
+    "#;
     let (_, rules) = pest_meta::parse_and_optimize(grammar).unwrap();
     println!("{:#?}", rules);
-    for rule in rules {
-        let mut ids = IdRegistry::new();
-        let exprs = extract_exprs(&rule.expr, &mut ids);
-        let mut full_code = String::new();
-        full_code.push_str("type Res<'i> = Result<&'i str, &'static str>;\n\n");
-        for expr in exprs {
-            let mut new_code = expr.code(&mut ids);
-            let mut new_code2 = new_code.trim_start_matches('\n');
-            let new_code2_len = new_code2.len();
-            new_code2 = new_code2.trim_start_matches(' ');
-            let len_diff = new_code2_len - new_code2.len();
-            let pattern = "\n".to_string() + &" ".repeat(len_diff);
-            new_code = new_code.replace(&pattern, "\n");
-            full_code.push_str(new_code.as_str());
-        }
+    let mut full_code = String::new();
+    full_code.push_str("type Res<'i> = Result<&'i str, &'static str>;\n\n");
+    let mut ids = IdRegistry::new();
+    let mut exprs = Vec::new();
+    for rule in &rules {
+        exprs.extend(extract_exprs(&rule.expr, &mut ids));
         let rule_name = rule.name.as_str();
         let top_expr_id = ids.id(&rule.expr);
         full_code.push_str(&format!(r#"
-        pub fn parse_{rule_name}<'i>(input: &'i str) -> Result<&'i str, &'static str> {{
-            match parse_{top_expr_id}(input) {{
-                Ok(i) => Ok(i),
-                Err(e) => Err(e),
-            }}
+        fn parse_{rule_name}<'i>(input: &'i str) -> Res<'i> {{
+            parse_{top_expr_id}(input)
         }}
         "#));
-        println!("{full_code}");
     }
+    for expr in exprs {
+        let mut new_code = expr.code(&mut ids);
+        let mut new_code2 = new_code.trim_start_matches('\n');
+        let new_code2_len = new_code2.len();
+        new_code2 = new_code2.trim_start_matches(' ');
+        let len_diff = new_code2_len - new_code2.len();
+        let pattern = "\n".to_string() + &" ".repeat(len_diff);
+        new_code = new_code.replace(&pattern, "\n");
+        full_code.push_str(new_code.as_str());
+    }
+    println!("{full_code}");
 }
