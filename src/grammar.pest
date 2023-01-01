@@ -1,4 +1,4 @@
-char = { ASCII_ALPHANUMERIC | "." | "_" | "/" }
+char = _{ ASCII_ALPHANUMERIC | "." | "_" | "/" }
 name = { char+ }
 value = { char* }
 

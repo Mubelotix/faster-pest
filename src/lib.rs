@@ -1,5 +1,5 @@
 use std::{collections::HashMap, hash::Hash};
-use pest_meta::optimizer::OptimizedExpr;
+use pest_meta::{optimizer::OptimizedExpr, ast::RuleType};
 
 struct IdRegistry {
     ids: HashMap<String, usize>,
@@ -44,29 +44,29 @@ fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry) -> Ve
     exprs
 }
 
-fn contains_idents(expr: &OptimizedExpr) -> bool {
+fn contains_idents(expr: &OptimizedExpr, silent_rules: &[&str]) -> bool {
     match expr {
         OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && ident != "ASCII_ALPHANUMERIC" => {
-            true
+            !silent_rules.contains(&ident.as_str())
         },
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr),
-        OptimizedExpr::Seq(first, second) | OptimizedExpr::Choice(first, second) => contains_idents(first) || contains_idents(second),
+        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, silent_rules),
+        OptimizedExpr::Seq(first, second) | OptimizedExpr::Choice(first, second) => contains_idents(first, silent_rules) || contains_idents(second, silent_rules),
         _ => false
     }
 }
 
 trait HackTrait {
-    fn code(&self, ids: &mut IdRegistry) -> String;
+    fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str]) -> String;
 }
 
 impl HackTrait for OptimizedExpr {
-    fn code(&self, ids: &mut IdRegistry) -> String {
+    fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str]) -> String {
         let id = ids.id(self);
-        let formatted_idents = match contains_idents(self) {
+        let formatted_idents = match contains_idents(self, silent_rules) {
             true => "idents: &'b mut Vec<Ident<'i>>",
             false => "",
         };
-        let (cancel1, cancel2, idents) = match contains_idents(self) {
+        let (cancel1, cancel2, idents) = match contains_idents(self, silent_rules) {
             true => ("let idents_len = idents.len();", "idents.truncate(idents_len);", "idents"),
             false => ("", "", ""),
         };
@@ -139,12 +139,12 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Choice(first, second) => {
                 let first_id = ids.id(first);
-                let first_idents = match contains_idents(first) {
+                let first_idents = match contains_idents(first, silent_rules) {
                     true => "idents",
                     false => "",
                 };
                 let second_id = ids.id(second);
-                let second_idents = match contains_idents(second) {
+                let second_idents = match contains_idents(second, silent_rules) {
                     true => "idents",
                     false => "",
                 };
@@ -178,12 +178,12 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Seq(first, second) => {
                 let first_id = ids.id(first);
-                let first_idents = match contains_idents(first) {
+                let first_idents = match contains_idents(first, silent_rules) {
                     true => "idents",
                     false => "",
                 };
                 let second_id = ids.id(second);
-                let second_idents = match contains_idents(second) {
+                let second_idents = match contains_idents(second, silent_rules) {
                     true => "idents",
                     false => "",
                 };
@@ -198,7 +198,7 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Rep(expr) => {
                 let expr_id = ids.id(expr);
-                let idents = match contains_idents(expr) {
+                let idents = match contains_idents(expr, silent_rules) {
                     true => "idents",
                     false => "",
                 };
@@ -249,13 +249,18 @@ fn test() {
     type Res<'i> = Result<&'i str, Error<'i>>;
     "#);
 
+    // Find silent rules
+    let silent_rules = rules.iter().filter(|rule| matches!(rule.ty, RuleType::Silent)).map(|rule| rule.name.as_str()).collect::<Vec<_>>();
+
     // Create Ident enum
     full_code.push_str("#[derive(Debug)]\n");
     full_code.push_str("pub enum Ident<'i> {\n");
     for rule in &rules {
         let name = rule.name.as_str();
-        let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
-        full_code.push_str(&format!("    {name_pascal_case}(&'i str),\n"));
+        if !silent_rules.contains(&name) {
+            let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
+            full_code.push_str(&format!("    {name_pascal_case}(&'i str),\n"));
+        }
     }
     full_code.push_str("}\n\n");
 
@@ -266,31 +271,40 @@ fn test() {
         let rule_name = rule.name.as_str();
         let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
         let top_expr_id = ids.id(&rule.expr);
-        let formatted_idents = match contains_idents(&rule.expr) {
+        let formatted_idents = match contains_idents(&rule.expr, &silent_rules) {
             true => "idents",
             false => "",
         };
-        full_code.push_str(&format!(r#"
-        fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
-            let i = idents.len();
-            idents.push(Ident::{rule_name_pascal_case}(""));
-            let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
-                Ok(input) => input,
-                Err(e) => {{
-                    idents.pop();
-                    return Err(e);
+        match silent_rules.contains(&rule_name) {
+            false => full_code.push_str(&format!(r#"
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
+                    let i = idents.len();
+                    idents.push(Ident::{rule_name_pascal_case}(""));
+                    let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
+                        Ok(input) => input,
+                        Err(e) => {{
+                            idents.pop();
+                            return Err(e);
+                        }}
+                    }};
+                    let new_ident = &input[..input.len() - new_input.len()];
+                    idents[i] = Ident::{rule_name_pascal_case}(new_ident);
+                    Ok(new_input)
                 }}
-            }};
-            let new_ident = &input[..input.len() - new_input.len()];
-            idents[i] = Ident::{rule_name_pascal_case}(new_ident);
-            Ok(new_input)
-        }}
-        "#));
+                "#)
+            ),
+            true => full_code.push_str(&format!(r#"
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+                    parse_{top_expr_id}(input, {formatted_idents})
+                }}
+                "#)
+            ),
+        }
     }
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();
     for expr in exprs {
-        let mut new_code = expr.code(&mut ids);
+        let mut new_code = expr.code(&mut ids, &silent_rules);
         let mut new_code2 = new_code.trim_start_matches('\n');
         let new_code2_len = new_code2.len();
         new_code2 = new_code2.trim_start_matches(' ');
