@@ -75,7 +75,7 @@ impl HackTrait for OptimizedExpr {
                 match ident.as_str() {
                     "ASCII_DIGIT" => {
                         format!(r#"
-                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                        fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                             if let Some(first) = input.chars().next() {{
                                 if first.is_ascii_digit() {{
                                     Ok(&input[1..])
@@ -86,6 +86,19 @@ impl HackTrait for OptimizedExpr {
                                 Err(Error{{desc: "Expected an ASCII digit, got EOI", input}})
                             }}
                         }}
+
+                        fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                            if let Some(first) = input.chars().next() {{
+                                if first.is_ascii_digit() {{
+                                    Some(&input[1..])
+                                }} else {{
+                                    None
+                                }}
+                            }} else {{
+                                None
+                            }}
+                        }}
+
                         "#)
                     }
                     "ASCII_ALPHANUMERIC" => {
@@ -101,6 +114,19 @@ impl HackTrait for OptimizedExpr {
                                 Err(Error{{desc: "Expected an ASCII alphanumeric, got EOI", input}})
                             }}
                         }}
+
+                        fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                            if let Some(first) = input.chars().next() {{
+                                if first.is_ascii_alphanumeric() {{
+                                    Some(&input[1..])
+                                }} else {{
+                                    None
+                                }}
+                            }} else {{
+                                None
+                            }}
+                        }}
+
                         "#)
                     }
                     "EOI" => {
@@ -112,6 +138,15 @@ impl HackTrait for OptimizedExpr {
                                 Err(Error{{desc: "Expected EOI", input}})
                             }}
                         }}
+
+                        fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                            if input.is_empty() {{
+                                Some(input)
+                            }} else {{
+                                None
+                            }}
+                        }}
+
                         "#)
                     }
                     "SOI" => {
@@ -119,6 +154,11 @@ impl HackTrait for OptimizedExpr {
                         fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
                             Ok(input)
                         }}
+
+                        fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                            Some(input)
+                        }}
+
                         "#)
                     }
                     "NEWLINE" => {
@@ -132,6 +172,17 @@ impl HackTrait for OptimizedExpr {
                                 Err(Error{{desc: "Expected newline", input}})
                             }}
                         }}
+
+                        fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                            if input.starts_with("\r\n") {{
+                                Some(&input[2..])
+                            }} else if input.starts_with("\n") {{
+                                Some(&input[1..])
+                            }} else {{
+                                None
+                            }}
+                        }}
+
                         "#)
                     }
                     _ => String::new()
@@ -156,13 +207,26 @@ impl HackTrait for OptimizedExpr {
                         return Ok(input);
                     }}
                     {cancel2}
-                    {cancel1}
                     if let Ok(input) = parse_{second_id}(input, {second_idents}) {{
                         return Ok(input);
                     }}
                     {cancel2}
                     Err(Error{{desc: "Expected either {first_id} or {second_id}", input}})
                 }}
+
+                fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                    {cancel1}
+                    if let Some(input) = quick_parse_{first_id}(input, {first_idents}) {{
+                        return Some(input);
+                    }}
+                    {cancel2}
+                    if let Some(input) = quick_parse_{second_id}(input, {second_idents}) {{
+                        return Some(input);
+                    }}
+                    {cancel2}
+                    None
+                }}
+
                 "#)
             }
             OptimizedExpr::Str(value) => {
@@ -174,6 +238,15 @@ impl HackTrait for OptimizedExpr {
                         Err(Error{{desc: "Expected '{value}'", input}})
                     }}
                 }}
+
+                fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                    if input.starts_with({value:?}) {{
+                        Some(&input[{value:?}.len()..])
+                    }} else {{
+                        None
+                    }}
+                }}
+
                 "#)
             }
             OptimizedExpr::Seq(first, second) => {
@@ -194,6 +267,13 @@ impl HackTrait for OptimizedExpr {
                     input = parse_{second_id}(input, {second_idents})?;
                     Ok(input)
                 }}
+
+                fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                    input = quick_parse_{first_id}(input, {first_idents})?;
+                    input = quick_parse_{second_id}(input, {second_idents})?;
+                    Some(input)
+                }}
+
                 "#)
             }
             OptimizedExpr::Rep(expr) => {
@@ -210,6 +290,14 @@ impl HackTrait for OptimizedExpr {
                     }}
                     Ok(input)
                 }}
+
+                fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                    while let Some(new_input) = quick_parse_{expr_id}(input, {idents}) {{
+                        input = new_input;
+                    }}
+                    Some(input)
+                }}
+
                 "#)
             }
             OptimizedExpr::Opt(expr) => {
@@ -223,6 +311,16 @@ impl HackTrait for OptimizedExpr {
                     }} else {{
                         {cancel2}
                         Ok(input)
+                    }}
+                }}
+
+                fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                    {cancel1}
+                    if let Some(input) = quick_parse_{expr_id}(input, {idents}) {{
+                        Some(input)
+                    }} else {{
+                        {cancel2}
+                        Some(input)
                     }}
                 }}
                 "#)
@@ -291,11 +389,30 @@ fn test() {
                     idents[i] = Ident::{rule_name_pascal_case}(new_ident);
                     Ok(new_input)
                 }}
+
+                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Option<&'i str> {{
+                    let i = idents.len();
+                    idents.push(Ident::{rule_name_pascal_case}(""));
+                    let new_input = match quick_parse_{top_expr_id}(input, {formatted_idents}) {{
+                        Some(input) => input,
+                        None => {{
+                            idents.pop();
+                            return None;
+                        }}
+                    }};
+                    let new_ident = &input[..input.len() - new_input.len()];
+                    idents[i] = Ident::{rule_name_pascal_case}(new_ident);
+                    Some(new_input)
+                }}
                 "#)
             ),
             true => full_code.push_str(&format!(r#"
                 fn parse_{rule_name}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
                     parse_{top_expr_id}(input, {formatted_idents})
+                }}
+
+                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                    quick_parse_{top_expr_id}(input, {formatted_idents})
                 }}
                 "#)
             ),
@@ -314,4 +431,10 @@ fn test() {
         full_code.push_str(new_code.as_str());
     }
     println!("{full_code}");
+}
+
+#[test]
+fn test2() {
+    println!("{}", std::mem::size_of::<Option<&str>>());
+    println!("{}", std::mem::size_of::<Result<&str, Box<String>>>());
 }
