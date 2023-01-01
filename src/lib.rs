@@ -64,6 +64,15 @@ fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a Optimi
     }
 }
 
+fn list_seq<'a, 'b>(expr: &'a OptimizedExpr, seq: &'b mut Vec<&'a OptimizedExpr>) {
+    if let OptimizedExpr::Seq(first, second) = expr {
+        seq.push(first);
+        seq.push(second);
+        list_seq(first, seq);
+        list_seq(second, seq);
+    }
+}
+
 trait HackTrait {
     fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str]) -> String;
 }
@@ -205,15 +214,15 @@ impl HackTrait for OptimizedExpr {
                 let mut quick_code = String::new();
                 let mut error_code = String::from("let mut errors = Vec::new();\n");
                 for (i, choice) in choices.iter().enumerate() {
-                    let id = ids.id(choice);
+                    let bid = ids.id(choice);
                     let idents = match contains_idents(choice, silent_rules) {
                         true => "idents",
                         false => "",
                     };
                     let cancel = if i == 0 { cancel1 } else { cancel2 } ;
-                    code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{id}(input, {idents}) {{ return Ok(input); }}\n"));
-                    quick_code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{id}(input, {idents}) {{ return Some(input); }}\n"));
-                    error_code.push_str(&format!("errors.push(parse_{id}(input, {idents}).unwrap_err());\n"));
+                    code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Ok(input); }}\n"));
+                    quick_code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Some(input); }}\n"));
+                    error_code.push_str(&format!("errors.push(parse_{bid}(input, {idents}).unwrap_err());\n"));
                 }
 
                 format!(r#"
@@ -221,7 +230,7 @@ impl HackTrait for OptimizedExpr {
                     {code}
                     {error_code}
                     {cancel2}
-                    Err(Error::new(ErrorKind::All(errors)), input, "choice {id}"))
+                    Err(Error::new(ErrorKind::All(errors), input, "choice {id}"))
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
@@ -252,28 +261,31 @@ impl HackTrait for OptimizedExpr {
 
                 "#)
             }
-            OptimizedExpr::Seq(first, second) => {
-                let first_id = ids.id(first);
-                let first_idents = match contains_idents(first, silent_rules) {
-                    true => "idents",
-                    false => "",
-                };
-                let second_id = ids.id(second);
-                let second_idents = match contains_idents(second, silent_rules) {
-                    true => "idents",
-                    false => "",
-                };
+            OptimizedExpr::Seq(_, _) => {
+                let mut seq = Vec::new();
+                list_seq(self, &mut seq);
+
+                let mut code = String::new();
+                let mut quick_code = String::new();
+                for (i, seq) in seq.iter().enumerate() {
+                    let bid = ids.id(seq);
+                    let idents = match contains_idents(seq, silent_rules) {
+                        true => "idents",
+                        false => "",
+                    };
+                    code.push_str(&format!("input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"))?;\n"));
+                    quick_code.push_str(&format!("input = quick_parse_{bid}(input, {idents})?;\n"));
+                }
+
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
-                    input = parse_{first_id}(input, {first_idents}).map_err(|e| e.with_trace("sequence {id} arm 1"))?;
-                    input = parse_{second_id}(input, {second_idents}).map_err(|e| e.with_trace("sequence {id} arm 2"))?;
+                    {code}
                     Ok(input)
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                    input = quick_parse_{first_id}(input, {first_idents})?;
-                    input = quick_parse_{second_id}(input, {second_idents})?;
+                    {quick_code}
                     Some(input)
                 }}
 
