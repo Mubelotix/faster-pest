@@ -48,23 +48,19 @@ fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry) -> Ve
 
 trait HackTrait {
     fn code(&self, ids: &mut IdRegistry) -> String;
-    fn output_ty(&self) -> String;
-    fn output_ty_for_choice(&self) -> String;
 }
 
 impl HackTrait for OptimizedExpr {
     fn code(&self, ids: &mut IdRegistry) -> String {
         let id = ids.id(self);
-        let output_ty = self.output_ty();
-        let output_ty_nolt = output_ty.trim_end_matches("<'i>");
         match self {
             OptimizedExpr::Ident(ident) => {
                 if ident == "ASCII_DIGIT" {
                     format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i, {output_ty}> {{
+                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                         if let Some(first) = input.chars().next() {{
                             if first.is_ascii_digit() {{
-                                Ok((&input[1..], &input[..1]))
+                                Ok(&input[1..])
                             }} else {{
                                 Err("nope")
                             }}
@@ -81,48 +77,25 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Choice(first, second) => {
                 let first_id = ids.id(first);
-                let first_ty_for_choice = first.output_ty_for_choice();
-                let first_ty = first.output_ty();
                 let second_id = ids.id(second);
-                let second_ty_for_choice = second.output_ty_for_choice();
-                let second_ty = second.output_ty();
 
-                if first_ty != second_ty {
-                    format!(r#"
-                    enum {output_ty} {{
-                        {first_ty_for_choice}({first_ty}),
-                        {second_ty_for_choice}({second_ty}),
+                format!(r#"
+                fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                    if let Ok(input) = parse_{first_id}(input) {{
+                        Ok(input)
+                    }} else if let Ok(input) = parse_{second_id}(input) {{
+                        Ok(input)
+                    }} else {{
+                        Err("nope")
                     }}
-    
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i, {output_ty}> {{
-                        if let Ok((input, res)) = parse_{first_id}(input) {{
-                            Ok((input, {output_ty_nolt}::{first_ty_for_choice}(res)))
-                        }} else if let Ok((input, res)) = parse_{second_id}(input) {{
-                            Ok((input, {output_ty_nolt}::{second_ty_for_choice}(res)))
-                        }} else {{
-                            Err("nope")
-                        }}
-                    }}
-                    "#)
-                } else {
-                    format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i, {output_ty}> {{
-                        if let Ok((input, res)) = parse_{first_id}(input) {{
-                            Ok((input, res))
-                        }} else if let Ok((input, res)) = parse_{second_id}(input) {{
-                            Ok((input, res))
-                        }} else {{
-                            Err("nope")
-                        }}
-                    }}
-                    "#)
-                }
+                }}
+                "#)
             }
             OptimizedExpr::Str(value) => {
                 format!(r#"
-                fn parse_{id}<'i>(input: &'i str) -> Res<'i, {output_ty}> {{
+                fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                     if input.starts_with("{value}") {{
-                        Ok((&input["{value}".len()..], "{value}"))
+                        Ok(&input["{value}".len()..])
                     }} else {{
                         Err("nope")
                     }}
@@ -133,93 +106,25 @@ impl HackTrait for OptimizedExpr {
                 let first_id = ids.id(first);
                 let second_id = ids.id(second);
                 format!(r#"
-                fn parse_{id}<'i>(input: &'i str) -> Res<'i, {output_ty}> {{
-                    let (input, res_{first_id}) = parse_{first_id}(input)?;
-                    let (input, res_{second_id}) = parse_{second_id}(input)?;
-                    Ok((input, (res_{first_id}, res_{second_id})))
+                fn parse_{id}<'i>(mut input: &'i str) -> Res<'i> {{
+                    input = parse_{first_id}(input)?;
+                    input = parse_{second_id}(input)?;
+                    Ok(input)
                 }}
                 "#)
             }
             OptimizedExpr::Rep(expr) => {
                 let expr_id = ids.id(expr);
                 format!(r#"
-                fn parse_{id}<'i>(mut input: &'i str) -> Res<'i, {output_ty}> {{
-                    let mut res = Vec::new();
-                    while let Ok((new_input, res_{expr_id})) = parse_{expr_id}(input) {{
+                fn parse_{id}<'i>(mut input: &'i str) -> Res<'i> {{
+                    while let Ok(new_input) = parse_{expr_id}(input) {{
                         input = new_input;
-                        res.push(res_{expr_id});
                     }}
-                    Ok((input, res))
+                    Ok(input)
                 }}
                 "#)
             }
             expr => todo!("code on {:?}", expr),
-        }
-    }
-
-    fn output_ty(&self) -> String {
-        match self {
-            OptimizedExpr::Seq(first, second) => {
-                let first_ty = first.output_ty();
-                let second_ty = second.output_ty();
-                format!("({first_ty}, {second_ty})")
-            }
-            OptimizedExpr::Choice(first, second) => {
-                let first_ty = first.output_ty_for_choice();
-                let second_ty = second.output_ty_for_choice();
-                if first_ty == second_ty {
-                    return first.output_ty();
-                }
-                format!("{first_ty}Or{second_ty}<'i>")
-            }
-            OptimizedExpr::Str(_)  => "&'i str".to_string(),
-            OptimizedExpr::Ident(ident) => {
-                if ident == "ASCII_DIGIT" {
-                    return "&'i str".to_string();
-                }
-                let mut chars = ident.chars();
-                let first = chars.next().unwrap().to_uppercase().to_string();
-                let rest = chars.collect::<String>();
-                format!("{}{}", first, rest)
-            },
-            OptimizedExpr::Rep(expr) => {
-                let ty = expr.output_ty();
-                format!("Vec<{ty}>")
-            }
-            expr => todo!("output ty on {:?}", expr),
-        }
-    }
-
-    fn output_ty_for_choice(&self) -> String {
-        match self {
-            OptimizedExpr::Seq(first, second) => {
-                let first_ty = first.output_ty_for_choice();
-                let second_ty = second.output_ty_for_choice();
-                format!("{first_ty}And{second_ty}")
-            }
-            OptimizedExpr::Choice(first, second) => {
-                let first_ty = first.output_ty_for_choice();
-                let second_ty = second.output_ty_for_choice();
-                if first_ty == second_ty {
-                    return first_ty;
-                }
-                format!("{first_ty}Or{second_ty}")
-            }
-            OptimizedExpr::Ident(ident) => {
-                if ident == "ASCII_DIGIT" {
-                    return "Str".to_string();
-                }
-                let mut chars = ident.chars();
-                let first = chars.next().unwrap().to_uppercase().to_string();
-                let rest = chars.collect::<String>();
-                format!("{}{}", first, rest)
-            },
-            OptimizedExpr::Str(_) => "Str".to_string(),
-            OptimizedExpr::Rep(expr) => {
-                let ty = expr.output_ty();
-                format!("Vec{ty}")
-            }
-            expr => todo!("choice output ty on {:?}", expr),
         }
     }
 }
@@ -233,7 +138,7 @@ fn test() {
         let mut ids = IdRegistry::new();
         let exprs = extract_exprs(&rule.expr, &mut ids);
         let mut full_code = String::new();
-        full_code.push_str("type Res<'i, T> = Result<(&'i str, T), &'static str>;\n\n");
+        full_code.push_str("type Res<'i> = Result<&'i str, &'static str>;\n\n");
         for expr in exprs {
             let mut new_code = expr.code(&mut ids);
             let mut new_code2 = new_code.trim_start_matches('\n');
@@ -246,11 +151,10 @@ fn test() {
         }
         let rule_name = rule.name.as_str();
         let top_expr_id = ids.id(&rule.expr);
-        let top_output_ty = rule.expr.output_ty();
         full_code.push_str(&format!(r#"
-        pub fn parse_{rule_name}<'i>(input: &'i str) -> Result<{top_output_ty}, &'static str> {{
+        pub fn parse_{rule_name}<'i>(input: &'i str) -> Result<&'i str, &'static str> {{
             match parse_{top_expr_id}(input) {{
-                Ok((_, res)) => Ok(res),
+                Ok(i) => Ok(i),
                 Err(e) => Err(e),
             }}
         }}
