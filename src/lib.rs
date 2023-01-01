@@ -80,10 +80,10 @@ impl HackTrait for OptimizedExpr {
                                 if first.is_ascii_digit() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err("Expected an ASCII digit")
+                                    Err(Error{{desc: Error{{desc: "Expected an ASCII digit", input}})
                                 }}
                             }} else {{
-                                Err("Expected an ASCII digit, got EOI")
+                                Err(Error{{desc: "Expected an ASCII digit, got EOI", input}})
                             }}
                         }}
                         "#)
@@ -95,10 +95,10 @@ impl HackTrait for OptimizedExpr {
                                 if first.is_ascii_alphanumeric() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err("Expected an ASCII alphanumeric")
+                                    Err(Error{{desc: "Expected an ASCII alphanumeric", input}})
                                 }}
                             }} else {{
-                                Err("Expected an ASCII alphanumeric, got EOI")
+                                Err(Error{{desc: "Expected an ASCII alphanumeric, got EOI", input}})
                             }}
                         }}
                         "#)
@@ -109,7 +109,7 @@ impl HackTrait for OptimizedExpr {
                             if input.is_empty() {{
                                 Ok(input)
                             }} else {{
-                                Err("Expected EOI")
+                                Err(Error{{desc: "Expected EOI", input}})
                             }}
                         }}
                         "#)
@@ -124,12 +124,12 @@ impl HackTrait for OptimizedExpr {
                     "NEWLINE" => {
                         format!(r#"
                         fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
-                            if input.starts_with("\\r\\n") {{
+                            if input.starts_with("\r\n") {{
                                 Ok(&input[2..])
-                            }} else if input.starts_with("\\n") {{
+                            }} else if input.starts_with("\n") {{
                                 Ok(&input[1..])
                             }} else {{
-                                Err("Expected newline")
+                                Err(Error{{desc: "Expected newline", input}})
                             }}
                         }}
                         "#)
@@ -161,7 +161,7 @@ impl HackTrait for OptimizedExpr {
                         return Ok(input);
                     }}
                     {cancel2}
-                    Err("Expected either {first_id} or {second_id}")
+                    Err(Error{{desc: "Expected either {first_id} or {second_id}", input}})
                 }}
                 "#)
             }
@@ -171,7 +171,7 @@ impl HackTrait for OptimizedExpr {
                     if input.starts_with({value:?}) {{
                         Ok(&input[{value:?}.len()..])
                     }} else {{
-                        Err("Expected '{value}'")
+                        Err(Error{{desc: "Expected '{value}'", input}})
                     }}
                 }}
                 "#)
@@ -232,13 +232,22 @@ impl HackTrait for OptimizedExpr {
     }
 }
 
+
 #[test]
 fn test() {
     let grammar = include_str!("grammar.pest");
     let (_, rules) = pest_meta::parse_and_optimize(grammar).unwrap();
     println!("{:#?}", rules);
     let mut full_code = String::new();
-    full_code.push_str("type Res<'i> = Result<&'i str, &'static str>;\n\n");
+    full_code.push_str(r#"
+    #[derive(Debug)]
+    struct Error<'i> {
+        desc: &'static str,
+        input: &'i str,
+    }
+
+    type Res<'i> = Result<&'i str, Error<'i>>;
+    "#);
 
     // Create Ident enum
     full_code.push_str("#[derive(Debug)]\n");
