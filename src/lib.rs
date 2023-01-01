@@ -41,14 +41,12 @@ fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry) -> Ve
         _ => ()
     }
     exprs.push(expr);
-    exprs.sort_by_key(|expr| ids.id(expr));
-    exprs.dedup_by_key(|expr| ids.id(expr));
     exprs
 }
 
 fn contains_idents(expr: &OptimizedExpr) -> bool {
     match expr {
-        OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" => {
+        OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && ident != "ASCII_ALPHANUMERIC" => {
             true
         },
         OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr),
@@ -68,6 +66,10 @@ impl HackTrait for OptimizedExpr {
             true => "idents: &'b mut Vec<Ident<'i>>",
             false => "",
         };
+        let (cancel1, cancel2, idents) = match contains_idents(self) {
+            true => ("let idents_len = idents.len();", "idents.truncate(idents_len);", "idents"),
+            false => ("", "", ""),
+        };
         match self {
             OptimizedExpr::Ident(ident) => {
                 match ident.as_str() {
@@ -78,10 +80,25 @@ impl HackTrait for OptimizedExpr {
                                 if first.is_ascii_digit() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err("nope")
+                                    Err("Expected an ASCII digit")
                                 }}
                             }} else {{
-                                Err("nope")
+                                Err("Expected an ASCII digit, got EOI")
+                            }}
+                        }}
+                        "#)
+                    }
+                    "ASCII_ALPHANUMERIC" => {
+                        format!(r#"
+                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                            if let Some(first) = input.chars().next() {{
+                                if first.is_ascii_alphanumeric() {{
+                                    Ok(&input[1..])
+                                }} else {{
+                                    Err("Expected an ASCII alphanumeric")
+                                }}
+                            }} else {{
+                                Err("Expected an ASCII alphanumeric, got EOI")
                             }}
                         }}
                         "#)
@@ -92,7 +109,7 @@ impl HackTrait for OptimizedExpr {
                             if input.is_empty() {{
                                 Ok(input)
                             }} else {{
-                                Err("nope")
+                                Err("Expected EOI")
                             }}
                         }}
                         "#)
@@ -101,6 +118,19 @@ impl HackTrait for OptimizedExpr {
                         format!(r#" // TODO
                         fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
                             Ok(input)
+                        }}
+                        "#)
+                    }
+                    "NEWLINE" => {
+                        format!(r#"
+                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                            if input.starts_with("\\r\\n") {{
+                                Ok(&input[2..])
+                            }} else if input.starts_with("\\n") {{
+                                Ok(&input[1..])
+                            }} else {{
+                                Err("Expected newline")
+                            }}
                         }}
                         "#)
                     }
@@ -121,13 +151,17 @@ impl HackTrait for OptimizedExpr {
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+                    {cancel1}
                     if let Ok(input) = parse_{first_id}(input, {first_idents}) {{
-                        Ok(input)
-                    }} else if let Ok(input) = parse_{second_id}(input, {second_idents}) {{
-                        Ok(input)
-                    }} else {{
-                        Err("nope")
+                        return Ok(input);
                     }}
+                    {cancel2}
+                    {cancel1}
+                    if let Ok(input) = parse_{second_id}(input, {second_idents}) {{
+                        return Ok(input);
+                    }}
+                    {cancel2}
+                    Err("Expected either {first_id} or {second_id}")
                 }}
                 "#)
             }
@@ -137,7 +171,7 @@ impl HackTrait for OptimizedExpr {
                     if input.starts_with({value:?}) {{
                         Ok(&input[{value:?}.len()..])
                     }} else {{
-                        Err("nope")
+                        Err("Expected '{value}'")
                     }}
                 }}
                 "#)
@@ -178,6 +212,21 @@ impl HackTrait for OptimizedExpr {
                 }}
                 "#)
             }
+            OptimizedExpr::Opt(expr) => {
+                let expr_id = ids.id(expr);
+
+                format!(r#"
+                fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+                    {cancel1}
+                    if let Ok(input) = parse_{expr_id}(input, {idents}) {{
+                        Ok(input)
+                    }} else {{
+                        {cancel2}
+                        Ok(input)
+                    }}
+                }}
+                "#)
+            }
             expr => todo!("code on {:?}", expr),
         }
     }
@@ -185,10 +234,7 @@ impl HackTrait for OptimizedExpr {
 
 #[test]
 fn test() {
-    let grammar = r#"field = { (ASCII_DIGIT | "." | "-")+ }
-record = { field ~ ("," ~ field)* }
-file = { SOI ~ (record ~ ("\r\n" | "\n"))* ~ EOI }
-    "#;
+    let grammar = include_str!("grammar.pest");
     let (_, rules) = pest_meta::parse_and_optimize(grammar).unwrap();
     println!("{:#?}", rules);
     let mut full_code = String::new();
@@ -232,6 +278,8 @@ file = { SOI ~ (record ~ ("\r\n" | "\n"))* ~ EOI }
         }}
         "#));
     }
+    exprs.sort_by_key(|expr| ids.id(expr));
+    exprs.dedup();
     for expr in exprs {
         let mut new_code = expr.code(&mut ids);
         let mut new_code2 = new_code.trim_start_matches('\n');
