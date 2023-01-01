@@ -46,6 +46,17 @@ fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry) -> Ve
     exprs
 }
 
+fn contains_idents(expr: &OptimizedExpr) -> bool {
+    match expr {
+        OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" => {
+            true
+        },
+        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr),
+        OptimizedExpr::Seq(first, second) | OptimizedExpr::Choice(first, second) => contains_idents(first) || contains_idents(second),
+        _ => false
+    }
+}
+
 trait HackTrait {
     fn code(&self, ids: &mut IdRegistry) -> String;
 }
@@ -53,35 +64,66 @@ trait HackTrait {
 impl HackTrait for OptimizedExpr {
     fn code(&self, ids: &mut IdRegistry) -> String {
         let id = ids.id(self);
+        let formatted_idents = match contains_idents(self) {
+            true => "idents: &'b mut Vec<Ident<'i>>",
+            false => "",
+        };
         match self {
             OptimizedExpr::Ident(ident) => {
-                if ident == "ASCII_DIGIT" {
-                    format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
-                        if let Some(first) = input.chars().next() {{
-                            if first.is_ascii_digit() {{
-                                Ok(&input[1..])
+                match ident.as_str() {
+                    "ASCII_DIGIT" => {
+                        format!(r#"
+                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                            if let Some(first) = input.chars().next() {{
+                                if first.is_ascii_digit() {{
+                                    Ok(&input[1..])
+                                }} else {{
+                                    Err("nope")
+                                }}
                             }} else {{
                                 Err("nope")
                             }}
-                        }} else {{
-                            Err("nope")
                         }}
-                    }}
-                    "#)
-                } else {
-                    String::new()
+                        "#)
+                    }
+                    "EOI" => {
+                        format!(r#"
+                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                            if input.is_empty() {{
+                                Ok(input)
+                            }} else {{
+                                Err("nope")
+                            }}
+                        }}
+                        "#)
+                    }
+                    "SOI" => {
+                        format!(r#" // TODO
+                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                            Ok(input)
+                        }}
+                        "#)
+                    }
+                    _ => String::new()
                 }
             }
             OptimizedExpr::Choice(first, second) => {
                 let first_id = ids.id(first);
+                let first_idents = match contains_idents(first) {
+                    true => "idents",
+                    false => "",
+                };
                 let second_id = ids.id(second);
+                let second_idents = match contains_idents(second) {
+                    true => "idents",
+                    false => "",
+                };
 
                 format!(r#"
-                fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
-                    if let Ok(input) = parse_{first_id}(input) {{
+                fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+                    if let Ok(input) = parse_{first_id}(input, {first_idents}) {{
                         Ok(input)
-                    }} else if let Ok(input) = parse_{second_id}(input) {{
+                    }} else if let Ok(input) = parse_{second_id}(input, {second_idents}) {{
                         Ok(input)
                     }} else {{
                         Err("nope")
@@ -91,7 +133,7 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Str(value) => {
                 format!(r#"
-                fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
                     if input.starts_with({value:?}) {{
                         Ok(&input[{value:?}.len()..])
                     }} else {{
@@ -102,20 +144,34 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Seq(first, second) => {
                 let first_id = ids.id(first);
+                let first_idents = match contains_idents(first) {
+                    true => "idents",
+                    false => "",
+                };
                 let second_id = ids.id(second);
+                let second_idents = match contains_idents(second) {
+                    true => "idents",
+                    false => "",
+                };
+
                 format!(r#"
-                fn parse_{id}<'i>(mut input: &'i str) -> Res<'i> {{
-                    input = parse_{first_id}(input)?;
-                    input = parse_{second_id}(input)?;
+                fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
+                    input = parse_{first_id}(input, {first_idents})?;
+                    input = parse_{second_id}(input, {second_idents})?;
                     Ok(input)
                 }}
                 "#)
             }
             OptimizedExpr::Rep(expr) => {
                 let expr_id = ids.id(expr);
+                let idents = match contains_idents(expr) {
+                    true => "idents",
+                    false => "",
+                };
+
                 format!(r#"
-                fn parse_{id}<'i>(mut input: &'i str) -> Res<'i> {{
-                    while let Ok(new_input) = parse_{expr_id}(input) {{
+                fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
+                    while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                         input = new_input;
                     }}
                     Ok(input)
@@ -137,15 +193,42 @@ file = { SOI ~ (record ~ ("\r\n" | "\n"))* ~ EOI }
     println!("{:#?}", rules);
     let mut full_code = String::new();
     full_code.push_str("type Res<'i> = Result<&'i str, &'static str>;\n\n");
+
+    // Create Ident enum
+    full_code.push_str("#[derive(Debug)]\n");
+    full_code.push_str("pub enum Ident<'i> {\n");
+    for rule in &rules {
+        let name = rule.name.as_str();
+        let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
+        full_code.push_str(&format!("    {name_pascal_case}(&'i str),\n"));
+    }
+    full_code.push_str("}\n\n");
+
     let mut ids = IdRegistry::new();
     let mut exprs = Vec::new();
     for rule in &rules {
         exprs.extend(extract_exprs(&rule.expr, &mut ids));
         let rule_name = rule.name.as_str();
+        let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
         let top_expr_id = ids.id(&rule.expr);
+        let formatted_idents = match contains_idents(&rule.expr) {
+            true => "idents",
+            false => "",
+        };
         full_code.push_str(&format!(r#"
-        fn parse_{rule_name}<'i>(input: &'i str) -> Res<'i> {{
-            parse_{top_expr_id}(input)
+        fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
+            let i = idents.len();
+            idents.push(Ident::{rule_name_pascal_case}(""));
+            let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
+                Ok(input) => input,
+                Err(e) => {{
+                    idents.pop();
+                    return Err(e);
+                }}
+            }};
+            let new_ident = &input[..input.len() - new_input.len()];
+            idents[i] = Ident::{rule_name_pascal_case}(new_ident);
+            Ok(new_input)
         }}
         "#));
     }
