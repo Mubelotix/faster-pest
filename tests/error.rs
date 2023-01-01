@@ -11,13 +11,19 @@ enum ErrorKind {
 struct Error {
     kind: ErrorKind,
     remaining_bytes: usize,
+    trace: Vec<String>,
 }
 
 impl Error {
-    fn new(kind: ErrorKind, input: &str) -> Error {
+    fn new(kind: ErrorKind, input: &str, root: impl Into<String>) -> Error {
         Error {
             kind,
             remaining_bytes: input.len(),
+            trace: vec![root.into()],
         }
+    }
+
+    fn add_trace(&mut self, trace: impl Into<String>) {
+        self.trace.push(trace.into());
     }
 }

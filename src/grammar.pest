@@ -7,6 +7,6 @@ property = { name ~ "=" ~ value }
 
 file = {
     SOI ~
-    ((section | property)? ~ NEWLINE)* ~
+    ((section | property)? ~ NEWLINE)+ ~
     EOI
 }

@@ -80,10 +80,10 @@ impl HackTrait for OptimizedExpr {
                                 if first.is_ascii_digit() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err(Error::new(ErrorKind::Expected("ASCII digit"), input))
+                                    Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "ASCII_DIGIT"))
                                 }}
                             }} else {{
-                                Err(Error::new(ErrorKind::Expected("ASCII digit"), input))
+                                Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "ASCII_DIGIT"))
                             }}
                         }}
 
@@ -108,10 +108,10 @@ impl HackTrait for OptimizedExpr {
                                 if first.is_ascii_alphanumeric() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input))
+                                    Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input, "ASCII_ALPHANUMERIC"))
                                 }}
                             }} else {{
-                                Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input))
+                                Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input, "ASCII_ALPHANUMERIC"))
                             }}
                         }}
 
@@ -135,7 +135,7 @@ impl HackTrait for OptimizedExpr {
                             if input.is_empty() {{
                                 Ok(input)
                             }} else {{
-                                Err(Error::new(ErrorKind::Expected("EOI"), input))
+                                Err(Error::new(ErrorKind::Expected("EOI"), input, "EOI"))
                             }}
                         }}
 
@@ -169,7 +169,7 @@ impl HackTrait for OptimizedExpr {
                             }} else if input.starts_with("\n") || input.starts_with("\r") {{
                                 Ok(&input[1..])
                             }} else {{
-                                Err(Error::new(ErrorKind::Expected("newline"), input))
+                                Err(Error::new(ErrorKind::Expected("newline"), input, "NEWLINE"))
                             }}
                         }}
 
@@ -213,7 +213,7 @@ impl HackTrait for OptimizedExpr {
                     let error_first = parse_{first_id}(input, {first_idents}).unwrap_err();
                     let error_second = parse_{second_id}(input, {second_idents}).unwrap_err();
                     {cancel2}
-                    Err(Error::new(ErrorKind::Both(Box::new(error_first), Box::new(error_second)), input))
+                    Err(Error::new(ErrorKind::Both(Box::new(error_first), Box::new(error_second)), input, "choice {id}"))
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
@@ -237,7 +237,7 @@ impl HackTrait for OptimizedExpr {
                     if input.starts_with({value:?}) {{
                         Ok(&input[{value:?}.len()..])
                     }} else {{
-                        Err(Error::new(ErrorKind::ExpectedValue({value:?}), input))
+                        Err(Error::new(ErrorKind::ExpectedValue({value:?}), input, "{id}"))
                     }}
                 }}
 
@@ -265,8 +265,8 @@ impl HackTrait for OptimizedExpr {
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
-                    input = parse_{first_id}(input, {first_idents})?;
-                    input = parse_{second_id}(input, {second_idents})?;
+                    input = parse_{first_id}(input, {first_idents}).map_err(|e| e.with_trace("sequence {id} arm 1"))?;
+                    input = parse_{second_id}(input, {second_idents}).map_err(|e| e.with_trace("sequence {id} arm 2"))?;
                     Ok(input)
                 }}
 
