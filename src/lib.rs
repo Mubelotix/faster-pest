@@ -80,10 +80,10 @@ impl HackTrait for OptimizedExpr {
                                 if first.is_ascii_digit() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err(Error{{desc: Error{{desc: "Expected an ASCII digit", input}})
+                                    Err(Error::new(ErrorKind::Expected("ASCII digit"), input))
                                 }}
                             }} else {{
-                                Err(Error{{desc: "Expected an ASCII digit, got EOI", input}})
+                                Err(Error::new(ErrorKind::Expected("ASCII digit"), input))
                             }}
                         }}
 
@@ -103,15 +103,15 @@ impl HackTrait for OptimizedExpr {
                     }
                     "ASCII_ALPHANUMERIC" => {
                         format!(r#"
-                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                        fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                             if let Some(first) = input.chars().next() {{
                                 if first.is_ascii_alphanumeric() {{
                                     Ok(&input[1..])
                                 }} else {{
-                                    Err(Error{{desc: "Expected an ASCII alphanumeric", input}})
+                                    Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input))
                                 }}
                             }} else {{
-                                Err(Error{{desc: "Expected an ASCII alphanumeric, got EOI", input}})
+                                Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input))
                             }}
                         }}
 
@@ -131,11 +131,11 @@ impl HackTrait for OptimizedExpr {
                     }
                     "EOI" => {
                         format!(r#"
-                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                        fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                             if input.is_empty() {{
                                 Ok(input)
                             }} else {{
-                                Err(Error{{desc: "Expected EOI", input}})
+                                Err(Error::new(ErrorKind::Expected("EOI"), input))
                             }}
                         }}
 
@@ -151,7 +151,7 @@ impl HackTrait for OptimizedExpr {
                     }
                     "SOI" => {
                         format!(r#" // TODO
-                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                        fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                             Ok(input)
                         }}
 
@@ -163,20 +163,20 @@ impl HackTrait for OptimizedExpr {
                     }
                     "NEWLINE" => {
                         format!(r#"
-                        fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                        fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                             if input.starts_with("\r\n") {{
                                 Ok(&input[2..])
-                            }} else if input.starts_with("\n") {{
+                            }} else if input.starts_with("\n") || input.starts_with("\r") {{
                                 Ok(&input[1..])
                             }} else {{
-                                Err(Error{{desc: "Expected newline", input}})
+                                Err(Error::new(ErrorKind::Expected("newline"), input))
                             }}
                         }}
 
                         fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                             if input.starts_with("\r\n") {{
                                 Some(&input[2..])
-                            }} else if input.starts_with("\n") {{
+                            }} else if input.starts_with("\n") || input.starts_with("\r") {{
                                 Some(&input[1..])
                             }} else {{
                                 None
@@ -203,15 +203,17 @@ impl HackTrait for OptimizedExpr {
                 format!(r#"
                 fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
                     {cancel1}
-                    if let Ok(input) = parse_{first_id}(input, {first_idents}) {{
+                    if let Some(input) = quick_parse_{first_id}(input, {first_idents}) {{
                         return Ok(input);
                     }}
                     {cancel2}
-                    if let Ok(input) = parse_{second_id}(input, {second_idents}) {{
+                    if let Some(input) = quick_parse_{second_id}(input, {second_idents}) {{
                         return Ok(input);
                     }}
+                    let error_first = parse_{first_id}(input, {first_idents}).unwrap_err();
+                    let error_second = parse_{second_id}(input, {second_idents}).unwrap_err();
                     {cancel2}
-                    Err(Error{{desc: "Expected either {first_id} or {second_id}", input}})
+                    Err(Error::new(ErrorKind::Both(Box::new(error_first), Box::new(error_second)), input))
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
@@ -231,11 +233,11 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Str(value) => {
                 format!(r#"
-                fn parse_{id}<'i, 'b>(input: &'i str) -> Res<'i> {{
+                fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
                     if input.starts_with({value:?}) {{
                         Ok(&input[{value:?}.len()..])
                     }} else {{
-                        Err(Error{{desc: "Expected '{value}'", input}})
+                        Err(Error::new(ErrorKind::ExpectedValue({value:?}), input))
                     }}
                 }}
 
@@ -338,13 +340,9 @@ fn test() {
     println!("{:#?}", rules);
     let mut full_code = String::new();
     full_code.push_str(r#"
-    #[derive(Debug)]
-    struct Error<'i> {
-        desc: &'static str,
-        input: &'i str,
-    }
+    
 
-    type Res<'i> = Result<&'i str, Error<'i>>;
+    type Res<'i> = Result<&'i str, Error>;
     "#);
 
     // Find silent rules
