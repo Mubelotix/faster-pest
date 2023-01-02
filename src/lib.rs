@@ -396,32 +396,32 @@ fn test() {
         match silent_rules.contains(&rule_name) {
             false => full_code.push_str(&format!(r#"
                 fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
-                    let i = idents.len();
+                    let idents_len = idents.len();
                     idents.push(Ident::{rule_name_pascal_case}(""));
                     let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
                         Ok(input) => input,
                         Err(e) => {{
-                            idents.pop();
+                            idents.truncate(idents_len);
                             return Err(e);
                         }}
                     }};
                     let new_ident = &input[..input.len() - new_input.len()];
-                    idents[i] = Ident::{rule_name_pascal_case}(new_ident);
+                    idents[idents_len] = Ident::{rule_name_pascal_case}(new_ident);
                     Ok(new_input)
                 }}
 
                 fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Option<&'i str> {{
-                    let i = idents.len();
+                    let idents_len = idents.len();
                     idents.push(Ident::{rule_name_pascal_case}(""));
                     let new_input = match quick_parse_{top_expr_id}(input, {formatted_idents}) {{
                         Some(input) => input,
                         None => {{
-                            idents.pop();
+                            idents.truncate(idents_len);
                             return None;
                         }}
                     }};
                     let new_ident = &input[..input.len() - new_input.len()];
-                    idents[i] = Ident::{rule_name_pascal_case}(new_ident);
+                    idents[idents_len] = Ident::{rule_name_pascal_case}(new_ident);
                     Some(new_input)
                 }}
                 "#)
