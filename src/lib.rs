@@ -47,7 +47,7 @@ fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry) -> Ve
 fn contains_idents(expr: &OptimizedExpr, silent_rules: &[&str]) -> bool {
     match expr {
         OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && ident != "ASCII_ALPHANUMERIC" => {
-            !silent_rules.contains(&ident.as_str())
+            true
         },
         OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, silent_rules),
         OptimizedExpr::Seq(first, second) | OptimizedExpr::Choice(first, second) => contains_idents(first, silent_rules) || contains_idents(second, silent_rules),
@@ -59,8 +59,8 @@ fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a Optimi
     if let OptimizedExpr::Choice(first, second) = expr {
         choices.push(first);
         choices.push(second);
-        list_choices(first, choices);
-        list_choices(second, choices);
+        //list_choices(first, choices);
+        //list_choices(second, choices);
     }
 }
 
@@ -68,8 +68,8 @@ fn list_seq<'a, 'b>(expr: &'a OptimizedExpr, seq: &'b mut Vec<&'a OptimizedExpr>
     if let OptimizedExpr::Seq(first, second) = expr {
         seq.push(first);
         seq.push(second);
-        list_seq(first, seq);
-        list_seq(second, seq);
+        //list_seq(first, seq);
+        //list_seq(second, seq);
     }
 }
 
@@ -349,7 +349,10 @@ impl HackTrait for OptimizedExpr {
 #[test]
 fn test() {
     let grammar = include_str!("grammar.pest");
-    let (_, rules) = pest_meta::parse_and_optimize(grammar).unwrap();
+    let (_, rules) = match pest_meta::parse_and_optimize(grammar) {
+        Ok(rules) => rules,
+        Err(e) => panic!("{}", e[0])
+    };
     println!("{:#?}", rules);
     let mut full_code = String::new();
     full_code.push_str(r#"
@@ -418,11 +421,11 @@ fn test() {
                 "#)
             ),
             true => full_code.push_str(&format!(r#"
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
                     parse_{top_expr_id}(input, {formatted_idents})
                 }}
 
-                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Option<&'i str> {{
                     quick_parse_{top_expr_id}(input, {formatted_idents})
                 }}
                 "#)

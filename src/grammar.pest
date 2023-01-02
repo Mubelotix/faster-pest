@@ -1,12 +1,9 @@
-char = _{ ASCII_ALPHANUMERIC | "." | "_" | "/" }
-name = { char+ }
-value = { char* }
+linecontent = {ASCII_ALPHANUMERIC*}
+line = _{"\"" ~ linecontent ~ "\"" ~ NEWLINE}
 
-section = { "[" ~ name ~ "]" }
-property = { name ~ "=" ~ value }
+msgid = {"msgid " ~ (line)+}
+msgstr = {"msgstr " ~ (line)+}
 
-file = {
-    SOI ~
-    ((section | property)? ~ NEWLINE)+ ~
-    EOI
-}
+entry = {msgid ~ msgstr}
+
+file = {(SOI ~ (entry ~ NEWLINE*)+ ~ EOI)}
