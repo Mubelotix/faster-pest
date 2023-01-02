@@ -7,3 +7,4 @@ msgstr = {"msgstr " ~ (line)+}
 entry = {msgid ~ msgstr}
 
 file = {(SOI ~ (entry ~ NEWLINE*)+ ~ EOI)}
+WHITESPACE = _{ " " }
