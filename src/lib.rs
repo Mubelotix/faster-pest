@@ -57,19 +57,19 @@ fn contains_idents(expr: &OptimizedExpr, silent_rules: &[&str]) -> bool {
 
 fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a OptimizedExpr>) {
     if let OptimizedExpr::Choice(first, second) = expr {
-        choices.push(first);
-        choices.push(second);
-        //list_choices(first, choices);
-        //list_choices(second, choices);
+        list_choices(first, choices);
+        list_choices(second, choices);
+    } else {
+        choices.push(expr);
     }
 }
 
 fn list_seq<'a, 'b>(expr: &'a OptimizedExpr, seq: &'b mut Vec<&'a OptimizedExpr>) {
     if let OptimizedExpr::Seq(first, second) = expr {
-        seq.push(first);
-        seq.push(second);
-        //list_seq(first, seq);
-        //list_seq(second, seq);
+        list_seq(first, seq);
+        list_seq(second, seq);
+    } else {
+        seq.push(expr);
     }
 }
 
