@@ -50,13 +50,15 @@ fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry, ignor
     exprs
 }
 
-fn contains_idents(expr: &OptimizedExpr, silent_rules: &[&str]) -> bool {
+fn contains_idents(expr: &OptimizedExpr, silent_rules: &[&str], has_whitespace: bool) -> bool {
     match expr {
         OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && ident != "ASCII_ALPHANUMERIC" => {
             true
         },
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, silent_rules),
-        OptimizedExpr::Seq(first, second) | OptimizedExpr::Choice(first, second) => contains_idents(first, silent_rules) || contains_idents(second, silent_rules),
+        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, silent_rules, has_whitespace),
+        OptimizedExpr::Seq(first, second) => has_whitespace || contains_idents(first, silent_rules, has_whitespace) || contains_idents(second, silent_rules, has_whitespace),
+        OptimizedExpr::Choice(first, second) => contains_idents(first, silent_rules, has_whitespace) || contains_idents(second, silent_rules, has_whitespace),
+        OptimizedExpr::Rep(expr) => has_whitespace || contains_idents(expr, silent_rules, has_whitespace),
         _ => false
     }
 }
@@ -80,17 +82,17 @@ fn list_seq<'a, 'b>(expr: &'a OptimizedExpr, seq: &'b mut Vec<&'a OptimizedExpr>
 }
 
 trait HackTrait {
-    fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str]) -> String;
+    fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str], has_whitespace: bool) -> String;
 }
 
 impl HackTrait for OptimizedExpr {
-    fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str]) -> String {
+    fn code(&self, ids: &mut IdRegistry, silent_rules: &[&str], has_whitespace: bool) -> String {
         let id = ids.id(self);
-        let formatted_idents = match contains_idents(self, silent_rules) {
+        let formatted_idents = match contains_idents(self, silent_rules, has_whitespace) {
             true => "idents: &'b mut Vec<Ident<'i>>",
             false => "",
         };
-        let (cancel1, cancel2, idents) = match contains_idents(self, silent_rules) {
+        let (cancel1, cancel2, idents) = match contains_idents(self, silent_rules, has_whitespace) {
             true => ("let idents_len = idents.len();", "idents.truncate(idents_len);", "idents"),
             false => ("", "", ""),
         };
@@ -221,7 +223,7 @@ impl HackTrait for OptimizedExpr {
                 let mut error_code = String::from("let mut errors = Vec::new();\n");
                 for (i, choice) in choices.iter().enumerate() {
                     let bid = ids.id(choice);
-                    let idents = match contains_idents(choice, silent_rules) {
+                    let idents = match contains_idents(choice, silent_rules, has_whitespace) {
                         true => "idents",
                         false => "",
                     };
@@ -275,12 +277,16 @@ impl HackTrait for OptimizedExpr {
                 let mut quick_code = String::new();
                 for (i, seq) in seq.iter().enumerate() {
                     let bid = ids.id(seq);
-                    let idents = match contains_idents(seq, silent_rules) {
+                    let idents = match contains_idents(seq, silent_rules, has_whitespace) {
                         true => "idents",
                         false => "",
                     };
                     code.push_str(&format!("input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"))?;\n"));
                     quick_code.push_str(&format!("input = quick_parse_{bid}(input, {idents})?;\n"));
+                    if has_whitespace {
+                        code.push_str("while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
+                        quick_code.push_str("while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }\n");
+                    }
                 }
 
 
@@ -299,15 +305,21 @@ impl HackTrait for OptimizedExpr {
             }
             OptimizedExpr::Rep(expr) => {
                 let expr_id = ids.id(expr);
-                let idents = match contains_idents(expr, silent_rules) {
+                let idents = match contains_idents(expr, silent_rules, has_whitespace) {
                     true => "idents",
                     false => "",
+                };
+
+                let (whitespace, quick_whitespace) = match has_whitespace {
+                    true => ("while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }", "while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }"),
+                    false => ("", ""),
                 };
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
                     while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                         input = new_input;
+                        {whitespace}
                     }}
                     Ok(input)
                 }}
@@ -315,6 +327,7 @@ impl HackTrait for OptimizedExpr {
                 fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
                     while let Some(new_input) = quick_parse_{expr_id}(input, {idents}) {{
                         input = new_input;
+                        {quick_whitespace}
                     }}
                     Some(input)
                 }}
@@ -370,6 +383,9 @@ fn test() {
     // Find silent rules
     let silent_rules = rules.iter().filter(|rule| matches!(rule.ty, RuleType::Silent)).map(|rule| rule.name.as_str()).collect::<Vec<_>>();
 
+    // Find if there is a rule named WHITESPACE
+    let has_whitespace = rules.iter().any(|rule| rule.name.as_str() == "WHITESPACE");
+
     // Create Ident enum
     full_code.push_str("#[derive(Debug)]\n");
     full_code.push_str("pub enum Ident<'i> {\n");
@@ -389,7 +405,7 @@ fn test() {
         let rule_name = rule.name.as_str();
         let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
         let top_expr_id = ids.id(&rule.expr);
-        let formatted_idents = match contains_idents(&rule.expr, &silent_rules) {
+        let formatted_idents = match contains_idents(&rule.expr, &silent_rules, has_whitespace) {
             true => "idents",
             false => "",
         };
@@ -441,7 +457,7 @@ fn test() {
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();
     for expr in exprs {
-        let mut new_code = expr.code(&mut ids, &silent_rules);
+        let mut new_code = expr.code(&mut ids, &silent_rules, has_whitespace);
         let mut new_code2 = new_code.trim_start_matches('\n');
         let new_code2_len = new_code2.len();
         new_code2 = new_code2.trim_start_matches(' ');
@@ -451,6 +467,10 @@ fn test() {
         full_code.push_str(new_code.as_str());
     }
     println!("{full_code}");
+
+    let data = std::fs::read_to_string("tests/test1.rs").unwrap();
+    let code = data.replace("[FULL_CODE]", full_code.as_str());
+    std::fs::write("tests/test2.rs", code).unwrap();
 }
 
 #[test]
