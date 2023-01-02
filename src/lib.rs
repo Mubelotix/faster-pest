@@ -30,17 +30,23 @@ impl IdRegistry {
     }
 }
 
-fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry) -> Vec<&'a OptimizedExpr> {
+fn extract_exprs<'a, 'b>(expr: &'a OptimizedExpr, ids: &'b mut IdRegistry, ignore_self: bool) -> Vec<&'a OptimizedExpr> {
     let mut exprs = Vec::new();
     match expr {
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => exprs.extend(extract_exprs(expr, ids)),
-        OptimizedExpr::Seq(first, second) | OptimizedExpr::Choice(first, second) => {
-            exprs.extend(extract_exprs(first, ids));
-            exprs.extend(extract_exprs(second, ids));
+        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => exprs.extend(extract_exprs(expr, ids, false)),
+        OptimizedExpr::Seq(first, second) => {
+            exprs.extend(extract_exprs(first, ids, matches!(**first, OptimizedExpr::Seq(_, _))));
+            exprs.extend(extract_exprs(second, ids, matches!(**second, OptimizedExpr::Seq(_, _))));
+        }
+        OptimizedExpr::Choice(first, second) => {
+            exprs.extend(extract_exprs(first, ids, matches!(**first, OptimizedExpr::Choice(_, _))));
+            exprs.extend(extract_exprs(second, ids, matches!(**second, OptimizedExpr::Choice(_, _))));
         }
         _ => ()
     }
-    exprs.push(expr);
+    if !ignore_self {
+        exprs.push(expr);
+    }
     exprs
 }
 
@@ -379,7 +385,7 @@ fn test() {
     let mut ids = IdRegistry::new();
     let mut exprs = Vec::new();
     for rule in &rules {
-        exprs.extend(extract_exprs(&rule.expr, &mut ids));
+        exprs.extend(extract_exprs(&rule.expr, &mut ids, false));
         let rule_name = rule.name.as_str();
         let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
         let top_expr_id = ids.id(&rule.expr);
