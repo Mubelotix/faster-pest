@@ -18,16 +18,17 @@ pub struct Tokens2 {
 pub struct Pair2<'i, I: IdentTrait> {
     all_idents: Rc<Vec<I>>,
     initial_text: &'i str,
-    i: usize,
+    start: usize,
+    end: usize,
 }
 
 impl<'i, I: IdentTrait> Pair2<'i, I> {
     pub fn as_rule(&self) -> I::Rule {
-        self.all_idents[self.i].as_rule()
+        self.all_idents[self.start].as_rule()
     }
 
     pub fn as_str(&self) -> &str {
-        self.all_idents[self.i].as_str()
+        self.all_idents[self.start].as_str()
     }
 
     #[deprecated = "Please use as_span instead"]
@@ -42,19 +43,8 @@ impl<'i, I: IdentTrait> Pair2<'i, I> {
     }
 
     pub fn into_inner(self) -> Pairs2<'i, I> {
-        let inner_end = self.as_str().as_ptr() as usize + self.as_str().len() - self.initial_text.as_ptr() as usize;
-
-        let mut i = self.i + 1;
-        while let Some(ident) = self.all_idents.get(i) {
-            let ident_start = ident.as_str().as_ptr() as usize - self.initial_text.as_ptr() as usize;
-            if ident_start >= inner_end {
-                break;
-            }
-            i += 1;
-        }
-        
         Pairs2 {
-            idents: Rc::new(self.all_idents[self.i + 1..i].to_vec()),
+            idents: Rc::new(self.all_idents[self.start + 1..self.end].to_vec()),
             initial_text: self.initial_text,
             i: 0,
         }
@@ -90,11 +80,25 @@ impl<'i, I: IdentTrait + 'i> Iterator for Pairs2<'i, I> {
         if self.i >= self.idents.len() {
             return None;
         }
-        self.i += 1;
+
+        let inner_end = self.idents[self.i].as_str().as_ptr() as usize + self.idents[self.i].as_str().len() - self.initial_text.as_ptr() as usize;
+        let start = self.i;
+        let mut end = self.i + 1;
+        while let Some(ident) = self.idents.get(end) {
+            let ident_start = ident.as_str().as_ptr() as usize - self.initial_text.as_ptr() as usize;
+            if ident_start >= inner_end {
+                break;
+            }
+            end += 1;
+        }
+
+        self.i = end;
+
         Some(Pair2 {
             all_idents: Rc::clone(&self.idents),
             initial_text: self.initial_text,
-            i: self.i - 1,
+            start,
+            end
         })
     }
 }
