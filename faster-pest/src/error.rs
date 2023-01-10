@@ -3,7 +3,7 @@ const NORMAL: &str = "\x1b[0m";
 const BLUE: &str = "\x1b[34m";
 
 #[derive(Debug)]
-enum ErrorKind {
+pub enum ErrorKind {
     ExpectedValue(&'static str),
     Expected(&'static str),
     All(Vec<Error>)
@@ -20,14 +20,14 @@ impl std::fmt::Display for ErrorKind {
 }
 
 #[derive(Debug)]
-struct Error {
+pub struct Error {
     kind: ErrorKind,
     remaining_bytes: usize,
     trace: Vec<String>,
 }
 
 impl Error {
-    fn new(kind: ErrorKind, input: &str, root: impl Into<String>) -> Error {
+    pub fn new(kind: ErrorKind, input: &str, root: impl Into<String>) -> Error {
         Error {
             kind,
             remaining_bytes: input.len(),
@@ -35,12 +35,12 @@ impl Error {
         }
     }
 
-    fn with_trace(mut self, trace: impl Into<String>) -> Self {
+    pub fn with_trace(mut self, trace: impl Into<String>) -> Self {
         self.trace.push(trace.into());
         self
     }
 
-    fn print(&self, input: &str) {
+    pub fn print(&self, input: &str) {
         if self.remaining_bytes > input.len() {
             panic!("Error::print: remaining_bytes is greater than input length");
         }

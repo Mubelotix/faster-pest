@@ -5,5 +5,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-pest_meta = "2.5.2"
+pest = "2.5"
 faster-pest-derive = { path="../faster-pest-derive" }
