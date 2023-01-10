@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "faster-pest",
+    "faster-pest-derive"
+]

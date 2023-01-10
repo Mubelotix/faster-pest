@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use pest_meta::{optimizer::OptimizedExpr, ast::RuleType};
+extern crate proc_macro;
+use proc_macro::TokenStream;
 
 struct IdRegistry {
     ids: HashMap<String, usize>,
@@ -364,11 +366,15 @@ impl HackTrait for OptimizedExpr {
     }
 }
 
-
-#[test]
-fn test() {
-    let grammar = include_str!("grammar.pest");
-    let (_, rules) = match pest_meta::parse_and_optimize(grammar) {
+#[proc_macro_attribute]
+pub fn grammar(attr: TokenStream, tokens: TokenStream) -> TokenStream {
+    let mut grammar_path = attr.to_string();
+    grammar_path.remove(0);
+    grammar_path.remove(grammar_path.len() - 1);
+    let Ok(grammar) = std::fs::read_to_string(&grammar_path) else {
+        panic!("Could not read grammar file at {grammar_path:?}");
+    };
+    let (_, rules) = match pest_meta::parse_and_optimize(&grammar) {
         Ok(rules) => rules,
         Err(e) => panic!("{}", e[0])
     };
@@ -468,9 +474,7 @@ fn test() {
     }
     println!("{full_code}");
 
-    let data = std::fs::read_to_string("tests/test1.rs").unwrap();
-    let code = data.replace("[FULL_CODE]", full_code.as_str());
-    std::fs::write("tests/test2.rs", code).unwrap();
+    format!("{tokens} {full_code}").parse().unwrap()
 }
 
 #[test]

@@ -1,6 +1,8 @@
-const RED: &str = "\x1b[31;1m";
+use faster_pest_derive::grammar;
+
+const RED: &str = "\x1b[31m";
 const NORMAL: &str = "\x1b[0m";
-const BLUE: &str = "\x1b[34;1m";
+const BLUE: &str = "\x1b[34m";
 
 #[derive(Debug)]
 enum ErrorKind {
@@ -60,23 +62,8 @@ impl Error {
     }
 }
 
-    
-[FULL_CODE]
 
-#[test]
-fn test() {
-    let input = r#"msgid "test"
-    "test2"
-msgstr   "test"
+#[grammar("/home/mubelotix/projects/pest-based-parser/faster-pest-derive/src/grammar.pest")]
+struct Parser {
 
-msgid "apricot"
-msgstr ""
-"test"
-"#;
-    let mut idents = Vec::new();
-    match parse_file(input, &mut idents) {
-        Ok(_) => {}
-        Err(e) => e.print(input)
-    }
-    dbg!(idents);
 }
