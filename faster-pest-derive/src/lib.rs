@@ -393,7 +393,7 @@ pub fn grammar(attr: TokenStream, tokens: TokenStream) -> TokenStream {
     let has_whitespace = rules.iter().any(|rule| rule.name.as_str() == "WHITESPACE");
 
     // Create Ident enum
-    full_code.push_str("#[derive(Debug)]\n");
+    full_code.push_str("#[derive(Debug, Copy, Clone)]\n");
     full_code.push_str("pub enum Ident<'i> {\n");
     for rule in &rules {
         let name = rule.name.as_str();
@@ -402,6 +402,60 @@ pub fn grammar(attr: TokenStream, tokens: TokenStream) -> TokenStream {
             full_code.push_str(&format!("    {name_pascal_case}(&'i str),\n"));
         }
     }
+    full_code.push_str("}\n");
+    full_code.push_str("impl<'i> IdentTrait for Ident<'i> {\n");
+    full_code.push_str("    type Rule = Rule;\n");
+    full_code.push_str("    \n");
+    full_code.push_str("    fn as_rule(&self) -> Rule {\n");
+    full_code.push_str("        match self {\n");
+    for rule in &rules {
+        let name = rule.name.as_str();
+        if !silent_rules.contains(&name) {
+            let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
+            full_code.push_str(&format!("            Ident::{name_pascal_case}(_) => Rule::{name},\n"));
+        }
+    }
+    full_code.push_str("        }\n");
+    full_code.push_str("    }\n");
+    full_code.push_str("    \n");
+    full_code.push_str("    fn as_str(&self) -> &str {\n");
+    full_code.push_str("        match self {\n");
+    for rule in &rules {
+        let name = rule.name.as_str();
+        if !silent_rules.contains(&name) {
+            let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
+            full_code.push_str(&format!("            Ident::{name_pascal_case}(s) => s,\n"));
+        }
+    }
+    full_code.push_str("        }\n");
+    full_code.push_str("    }\n");
+    full_code.push_str("}\n\n");
+
+    // Create Rule enum
+    full_code.push_str("#[derive(Debug, Copy, Clone)]\n");
+    full_code.push_str("pub enum Rule {\n");
+    for rule in &rules {
+        let name = rule.name.as_str();
+        if !silent_rules.contains(&name) {
+            full_code.push_str(&format!("    {name},\n"));
+        }
+    }
+    full_code.push_str("}\n\n");
+
+    // Create parse method TODO name
+    full_code.push_str("impl CSVParser {\n");
+    full_code.push_str("    pub fn parse(rule: Rule, input: &str) -> Result<Pairs2<Ident>, Error> {\n");
+    full_code.push_str("        let mut idents = Vec::new();\n");
+    full_code.push_str("        match rule {\n");
+    for rule in &rules {
+        let name = rule.name.as_str();
+        if !silent_rules.contains(&name) {
+            full_code.push_str(&format!("            Rule::{name} => parse_{name}(input, &mut idents)?,\n"));
+        }
+    }
+    full_code.push_str("        };\n");
+    full_code.push_str("        Ok(Pairs2::from_idents(idents, input))\n");
+    full_code.push_str("    }\n");
     full_code.push_str("}\n\n");
 
     let mut ids = IdRegistry::new();
@@ -475,10 +529,4 @@ pub fn grammar(attr: TokenStream, tokens: TokenStream) -> TokenStream {
     println!("{full_code}");
 
     format!("{tokens} {full_code}").parse().unwrap()
-}
-
-#[test]
-fn test2() {
-    println!("{}", std::mem::size_of::<Option<&str>>());
-    println!("{}", std::mem::size_of::<Result<&str, Box<String>>>());
 }
