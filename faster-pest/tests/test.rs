@@ -1,4 +1,4 @@
-use faster_pest_derive::grammar;
+use faster_pest::grammar;
 
 const RED: &str = "\x1b[31m";
 const NORMAL: &str = "\x1b[0m";

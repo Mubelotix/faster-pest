@@ -6,3 +6,4 @@ edition = "2021"
 
 [dependencies]
 pest_meta = "2.5.2"
+faster-pest-derive = { path="../faster-pest-derive" }
