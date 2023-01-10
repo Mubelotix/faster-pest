@@ -5,8 +5,9 @@ struct CSVParser {
 
 }
 
+#[test]
 fn main() {
-    let unparsed_file = std::fs::read_to_string("numbers.csv").expect("cannot read file");
+    let unparsed_file = std::fs::read_to_string("tests/numbers.csv").expect("cannot read file");
     
     let file = CSVParser::parse(Rule::file, &unparsed_file)
         .expect("unsuccessful parse") // unwrap the parse result
@@ -25,7 +26,7 @@ fn main() {
                 }
             }
             // TODO Rule::EOI => (),
-            _ => unreachable!(),
+            o => println!("Unexpected {o:?}")
         }
     }
 
