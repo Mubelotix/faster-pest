@@ -158,7 +158,9 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 return format!(r#"
                 // {condition}
                 fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                    if let Some(c) = input.as_bytes().first() {{
+                    let b = input.as_bytes();
+                    if !b.is_empty() {{
+                        let c = unsafe {{ b.get_unchecked(0) }};
                         if {condition} {{
                             Ok(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
@@ -169,7 +171,9 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     }}
                 }}
                 fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                    if let Some(c) = input.as_bytes().first() {{
+                    let b = input.as_bytes();
+                    if !b.is_empty() {{
+                        let c = unsafe {{ b.get_unchecked(0) }};
                         if {condition} {{
                             Some(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
