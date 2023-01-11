@@ -30,7 +30,7 @@ mod pest_classic {
                 .expect("unsuccessful parse")
                 .next().unwrap();
 
-            let mut field_sum: f64 = 0.0;
+            /*let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
 
             for record in file.into_inner() {
@@ -47,7 +47,7 @@ mod pest_classic {
                 }
             }
 
-            (field_sum, record_count)
+            (field_sum, record_count)*/
         }));
     }
 }
@@ -78,7 +78,7 @@ mod faster_pest {
                 .expect("unsuccessful parse")
                 .next().unwrap();
 
-            let mut field_sum: f64 = 0.0;
+            /*let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
 
             for record in file.into_inner() {
@@ -93,7 +93,7 @@ mod faster_pest {
                     // TODO Rule::EOI => (),
                     o => println!("Unexpected {o:?}")
                 }
-            }
+            }*/
         }));
     }
 }
