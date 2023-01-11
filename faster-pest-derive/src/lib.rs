@@ -95,13 +95,13 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     // Create parse method TODO name
     full_code.push_str("#[automatically_derived]\n");
     full_code.push_str(&format!("impl {} {{\n", ast.ident));
-    full_code.push_str("    pub fn parse(rule: Rule, input: &str) -> Result<Pairs2<Ident>, pest::error::Error<Rule>> {\n");
+    full_code.push_str("    pub fn parse(rule: Rule, input: &str) -> Result<Pairs2<Ident>, Error> {\n");
     full_code.push_str("        let mut idents = Vec::new();\n");
     full_code.push_str("        match rule {\n");
     for rule in &rules {
         let name = rule.name.as_str();
         if !silent_rules.contains(&name) {
-            full_code.push_str(&format!("            Rule::{name} => parse_{name}(input, &mut idents).map_err(|e| e.into_pest(input))?,\n"));
+            full_code.push_str(&format!("            Rule::{name} => parse_{name}(input, &mut idents)?,\n"));
         }
     }
     full_code.push_str("        };\n");

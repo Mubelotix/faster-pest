@@ -15,7 +15,7 @@ fn main() {
     };
 
     let file = POParser::parse(Rule::file, &unparsed_file)
-        .expect("unsuccessful parse")
+        .map_err(|e| e.print(unparsed_file.as_str())).unwrap()
         .next().unwrap(); // get and unwrap the `file` rule; never fails
 
     for line in file.into_inner() {
