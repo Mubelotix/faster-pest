@@ -1,15 +1,15 @@
 use faster_pest::*;
 
 #[derive(Parser)]
-#[grammar = "faster-pest/examples/csv/csv.pest"]
+#[grammar = "faster-pest/examples/csv/grammar.pest"]
 struct CSVParser {
 
 }
 
 fn main() {
-    let unparsed_file = match std::fs::read_to_string("faster-pest/examples/csv/numbers.csv") {
+    let unparsed_file = match std::fs::read_to_string("faster-pest/examples/csv/input.csv") {
         Ok(s) => s,
-        Err(_) => match std::fs::read_to_string("examples/csv/numbers.csv") {
+        Err(_) => match std::fs::read_to_string("examples/csv/input.csv") {
             Ok(s) => s,
             Err(e) => panic!("cannot read file: {}", e)
         }

@@ -2,7 +2,7 @@ use faster_pest::*;
 use std::collections::HashMap;
 
 #[derive(Parser)]
-#[grammar = "faster-pest/examples/ini/ini.pest"]
+#[grammar = "faster-pest/examples/ini/grammar.pest"]
 pub struct INIParser;
 
 fn main() {

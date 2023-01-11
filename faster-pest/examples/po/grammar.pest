@@ -1,0 +1,11 @@
+WSP = _{ " "* }
+
+linecontent = { "" }
+line = _{WSP ~ "\"" ~ linecontent ~ "\"" ~ WSP ~ NEWLINE}
+
+msgid = {"msgid " ~ (line)+}
+msgstr = {"msgstr " ~ (line)+}
+
+entry = {msgid ~ msgstr}
+
+file = {(SOI ~ (entry ~ NEWLINE*)+ ~ EOI)}
