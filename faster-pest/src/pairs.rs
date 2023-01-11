@@ -57,7 +57,14 @@ impl<'i, I: IdentTrait> Pair2<'i, I> {
         }
     }
 
-    pub fn into_inner(self) -> Pairs2<'i, I> { self.inner() }
+    pub fn into_inner(self) -> Pairs2<'i, I> {
+        Pairs2 {
+            all_idents: self.all_idents,
+            range: self.range.start + 1..self.range.end,
+            initial_text: self.initial_text,
+            i: 0,
+        }
+    }
 
     pub fn tokens(self) -> Tokens2 {
         unimplemented!()
