@@ -222,7 +222,7 @@ impl HackTrait for OptimizedExpr {
 
                 let mut code = String::new();
                 let mut quick_code = String::new();
-                let mut error_code = String::from("let mut errors = Vec::new();\n");
+                let mut error_code = String::from("    let mut errors = Vec::new();\n");
                 for (i, choice) in choices.iter().enumerate() {
                     let bid = ids.id(choice);
                     let idents = match contains_idents(choice, has_whitespace) {
@@ -230,21 +230,21 @@ impl HackTrait for OptimizedExpr {
                         false => "",
                     };
                     let cancel = if i == 0 { cancel1 } else { cancel2 } ;
-                    code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Ok(input); }}\n"));
-                    quick_code.push_str(&format!("{cancel} if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Some(input); }}\n"));
-                    error_code.push_str(&format!("errors.push(parse_{bid}(input, {idents}).unwrap_err());\n"));
+                    code.push_str(&format!("{cancel}    if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Ok(input); }}\n"));
+                    quick_code.push_str(&format!("{cancel}    if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Some(input); }}\n"));
+                    error_code.push_str(&format!("    errors.push(parse_{bid}(input, {idents}).unwrap_err());\n"));
                 }
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
-                    {code}
-                    {error_code}
+                {code}
+                {error_code}
                     {cancel2}
                     Err(Error::new(ErrorKind::All(errors), input, "choice {id}"))
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                    {quick_code}
+                {quick_code}
                     {cancel2}
                     None
                 }}
@@ -283,23 +283,23 @@ impl HackTrait for OptimizedExpr {
                         true => "idents",
                         false => "",
                     };
-                    code.push_str(&format!("input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"))?;\n"));
-                    quick_code.push_str(&format!("input = quick_parse_{bid}(input, {idents})?;\n"));
+                    code.push_str(&format!("    input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"))?;\n"));
+                    quick_code.push_str(&format!("    input = quick_parse_{bid}(input, {idents})?;\n"));
                     if has_whitespace {
-                        code.push_str("while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
-                        quick_code.push_str("while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }\n");
+                        code.push_str("    while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
+                        quick_code.push_str("    while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }\n");
                     }
                 }
 
 
                 format!(r#"
                 fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
-                    {code}
+                {code}
                     Ok(input)
                 }}
 
                 fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                    {quick_code}
+                {quick_code}
                     Some(input)
                 }}
 
