@@ -96,7 +96,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     full_code.push_str("#[automatically_derived]\n");
     full_code.push_str(&format!("impl {} {{\n", ast.ident));
     full_code.push_str("    pub fn parse(rule: Rule, input: &str) -> Result<Pairs2<Ident>, Error> {\n");
-    full_code.push_str("        let mut idents = Vec::new();\n");
+    full_code.push_str("        let mut idents = Vec::with_capacity(500);\n"); // TODO: refine 500
     full_code.push_str("        match rule {\n");
     for rule in &rules {
         let name = rule.name.as_str();

@@ -26,11 +26,11 @@ mod pest_classic {
         };
 
         b.iter(|| black_box({
-            CSVParser::parse(Rule::file, &unparsed_file)
+            let file = CSVParser::parse(Rule::file, &unparsed_file)
                 .expect("unsuccessful parse")
-                .next().unwrap()
+                .next().unwrap();
 
-            /*let mut field_sum: f64 = 0.0;
+            let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
 
             for record in file.into_inner() {
@@ -45,7 +45,9 @@ mod pest_classic {
                     // TODO Rule::EOI => (),
                     o => println!("Unexpected {o:?}")
                 }
-            }*/
+            }
+
+            (field_sum, record_count)
         }));
     }
 }
@@ -72,11 +74,11 @@ mod faster_pest {
         };
 
         b.iter(|| black_box({
-            CSVParser::parse(Rule::file, &unparsed_file)
+            let file = CSVParser::parse(Rule::file, &unparsed_file)
                 .expect("unsuccessful parse")
-                .next().unwrap()
+                .next().unwrap();
 
-            /*let mut field_sum: f64 = 0.0;
+            let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
 
             for record in file.into_inner() {
@@ -91,7 +93,7 @@ mod faster_pest {
                     // TODO Rule::EOI => (),
                     o => println!("Unexpected {o:?}")
                 }
-            }*/
+            }
         }));
     }
 }
