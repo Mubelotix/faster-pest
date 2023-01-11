@@ -4,57 +4,8 @@ use proc_macro::TokenStream;
 
 mod ids;
 use ids::*;
-
-fn extract_exprs(expr: &OptimizedExpr, ignore_self: bool) -> Vec<&OptimizedExpr> {
-    let mut exprs = Vec::new();
-    match expr {
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => exprs.extend(extract_exprs(expr, false)),
-        OptimizedExpr::Seq(first, second) => {
-            exprs.extend(extract_exprs(first, matches!(**first, OptimizedExpr::Seq(_, _))));
-            exprs.extend(extract_exprs(second, matches!(**second, OptimizedExpr::Seq(_, _))));
-        }
-        OptimizedExpr::Choice(first, second) => {
-            exprs.extend(extract_exprs(first, matches!(**first, OptimizedExpr::Choice(_, _))));
-            exprs.extend(extract_exprs(second, matches!(**second, OptimizedExpr::Choice(_, _))));
-        }
-        _ => ()
-    }
-    if !ignore_self {
-        exprs.push(expr);
-    }
-    exprs
-}
-
-fn contains_idents(expr: &OptimizedExpr, has_whitespace: bool) -> bool {
-    match expr {
-        OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && ident != "ASCII_ALPHANUMERIC" => {
-            true
-        },
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, has_whitespace),
-        OptimizedExpr::Seq(first, second) => has_whitespace || contains_idents(first, has_whitespace) || contains_idents(second, has_whitespace),
-        OptimizedExpr::Choice(first, second) => contains_idents(first, has_whitespace) || contains_idents(second, has_whitespace),
-        OptimizedExpr::Rep(expr) => has_whitespace || contains_idents(expr, has_whitespace),
-        _ => false
-    }
-}
-
-fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a OptimizedExpr>) {
-    if let OptimizedExpr::Choice(first, second) = expr {
-        list_choices(first, choices);
-        list_choices(second, choices);
-    } else {
-        choices.push(expr);
-    }
-}
-
-fn list_seq<'a, 'b>(expr: &'a OptimizedExpr, seq: &'b mut Vec<&'a OptimizedExpr>) {
-    if let OptimizedExpr::Seq(first, second) = expr {
-        list_seq(first, seq);
-        list_seq(second, seq);
-    } else {
-        seq.push(expr);
-    }
-}
+mod tree_inspection;
+use tree_inspection::*;
 
 fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
@@ -441,7 +392,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     let mut ids = IdRegistry::new();
     let mut exprs = Vec::new();
     for rule in &rules {
-        exprs.extend(extract_exprs(&rule.expr, false));
+        exprs.extend(list_exprs(&rule.expr, false));
         let rule_name = rule.name.as_str();
         let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
         let top_expr_id = ids.id(&rule.expr);
