@@ -1,6 +1,6 @@
 WSP = _{ " "* }
 
-linecontent = { "" }
+linecontent = {(ASCII_ALPHANUMERIC | " " | ".")*}
 line = _{WSP ~ "\"" ~ linecontent ~ "\"" ~ WSP ~ NEWLINE}
 
 msgid = {"msgid " ~ (line)+}

@@ -62,10 +62,10 @@ impl Error {
         let position_in_utf8_line = input[line_start..position].chars().count();
 
         println!("{RED}error{NORMAL}: {}", self.kind);
-        println!("{BLUE} -->{NORMAL} {}:{}:{}", self.trace[0], line_number, position - line_start + 1);
-        println!("   {BLUE}|{NORMAL}");
-        println!("{:>3}{BLUE}|{NORMAL} {}", line_number, &input[line_start..line_end]);
-        println!("   {BLUE}|{NORMAL} {}{RED}^{NORMAL}", " ".repeat(position_in_utf8_line));
+        println!("{BLUE}  -->{NORMAL} {}:{}:{}", self.trace[0], line_number, position - line_start + 1);
+        println!("{BLUE}   |{NORMAL}");
+        println!("{BLUE}{:<3}|{NORMAL} {}", line_number, &input[line_start..line_end]);
+        println!("{BLUE}   |{NORMAL} {}{RED}^{NORMAL}", " ".repeat(position_in_utf8_line));
         if let Some(note) = &self.note {
             println!("   {BLUE}= {NORMAL}{BOLD}note{NORMAL}: {note}");
         }
