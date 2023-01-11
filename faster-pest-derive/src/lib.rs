@@ -22,7 +22,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             match ident.as_str() {
                 "ASCII_DIGIT" => {
                     format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         if let Some(first) = input.chars().next() {{
                             if first.is_ascii_digit() {{
                                 Ok(&input[1..])
@@ -50,7 +50,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 }
                 "ASCII_ALPHANUMERIC" => {
                     format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         if let Some(first) = input.chars().next() {{
                             if first.is_ascii_alphanumeric() {{
                                 Ok(&input[1..])
@@ -78,7 +78,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 }
                 "EOI" => {
                     format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         if input.is_empty() {{
                             Ok(input)
                         }} else {{
@@ -98,7 +98,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 }
                 "SOI" => {
                     format!(r#" // TODO
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         Ok(input)
                     }}
 
@@ -110,7 +110,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 }
                 "NEWLINE" => {
                     format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         if input.starts_with("\r\n") {{
                             Ok(&input[2..])
                         }} else if input.starts_with("\n") || input.starts_with("\r") {{
@@ -155,7 +155,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             }
 
             format!(r#"
-            fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+            fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
             {code}
             {error_code}
                 {cancel2}
@@ -172,7 +172,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
         }
         OptimizedExpr::Str(value) => {
             format!(r#"
-            fn parse_{id}<'i>(input: &'i str) -> Res<'i> {{
+            fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                 if input.starts_with({value:?}) {{
                     Ok(&input[{value:?}.len()..])
                 }} else {{
@@ -212,7 +212,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
 
 
             format!(r#"
-            fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
+            fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
             {code}
                 Ok(input)
             }}
@@ -237,7 +237,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             };
 
             format!(r#"
-            fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Res<'i> {{
+            fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                     input = new_input;
                     {whitespace}
@@ -259,7 +259,7 @@ fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             let expr_id = ids.id(expr);
 
             format!(r#"
-            fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Res<'i> {{
+            fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 {cancel1}
                 if let Ok(input) = parse_{expr_id}(input, {idents}) {{
                     Ok(input)
@@ -310,11 +310,6 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     };
     println!("{:#?}", rules);
     let mut full_code = String::new();
-    full_code.push_str(r#"
-    
-
-    type Res<'i> = Result<&'i str, Error>;
-    "#);
 
     // Find silent rules
     let silent_rules = rules.iter().filter(|rule| matches!(rule.ty, RuleType::Silent)).map(|rule| rule.name.as_str()).collect::<Vec<_>>();
@@ -402,7 +397,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
         };
         match silent_rules.contains(&rule_name) {
             false => full_code.push_str(&format!(r#"
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Result<&'i str, Error> {{
                     let idents_len = idents.len();
                     idents.push(Ident::{rule_name_pascal_case}(""));
                     let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
@@ -434,7 +429,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                 "#)
             ),
             true => full_code.push_str(&format!(r#"
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Res<'i> {{
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Result<&'i str, Error> {{
                     parse_{top_expr_id}(input, {formatted_idents})
                 }}
 
@@ -459,5 +454,5 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     }
     println!("{full_code}");
 
-    format!("{full_code}").parse().unwrap()
+    full_code.parse().unwrap()
 }
