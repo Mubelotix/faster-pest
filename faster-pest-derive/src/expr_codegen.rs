@@ -304,29 +304,11 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     return format!(r#"
                     // {hr_expr}
                     fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
-                        let b = input.as_bytes();
-                        let mut i = 0;
-                        while i < b.len() {{
-                            let c = unsafe {{ b.get_unchecked(i) }};
-                            if {condition} {{
-                                i += 1;
-                            }} else {{
-                                break;
-                            }}
-                        }}
+                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(0);
                         Ok(unsafe {{ input.get_unchecked(i..) }})
                     }}
                     fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                        let b = input.as_bytes();
-                        let mut i = 0;
-                        while i < b.len() {{
-                            let c = unsafe {{ b.get_unchecked(i) }};
-                            if {condition} {{
-                                i += 1;
-                            }} else {{
-                                break;
-                            }}
-                        }}
+                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(0);
                         Some(unsafe {{ input.get_unchecked(i..) }})
                     }}
         
