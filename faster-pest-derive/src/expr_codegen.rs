@@ -90,18 +90,18 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     format!(r#"
                     fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         if input.starts_with("\r\n") {{
-                            Ok(&input[2..])
+                            Ok(unsafe {{ input.get_unchecked(2..) }})
                         }} else if input.starts_with("\n") || input.starts_with("\r") {{
-                            Ok(&input[1..])
+                            Ok(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
                             Err(Error::new(ErrorKind::Expected("newline"), input, "NEWLINE"))
                         }}
                     }}
                     fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                         if input.starts_with("\r\n") {{
-                            Some(&input[2..])
+                            Some(unsafe {{ input.get_unchecked(2..) }})
                         }} else if input.starts_with("\n") || input.starts_with("\r") {{
-                            Some(&input[1..])
+                            Some(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
                             None
                         }}
@@ -218,14 +218,14 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             // {hr_expr}
             fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                 if input.starts_with({value:?}) {{
-                    Ok(&input[{value:?}.len()..])
+                    Ok(unsafe {{ input.get_unchecked({value:?}.len()..) }})
                 }} else {{
                     Err(Error::new(ErrorKind::ExpectedValue({value:?}), input, "{id} {hr_expre}"))
                 }}
             }}
             fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                 if input.starts_with({value:?}) {{
-                    Some(&input[{value:?}.len()..])
+                    Some(unsafe {{ input.get_unchecked({value:?}.len()..) }})
                 }} else {{
                     None
                 }}
