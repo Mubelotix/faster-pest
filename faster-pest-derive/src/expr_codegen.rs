@@ -1,5 +1,16 @@
 use crate::*;
 
+const CONDITIONS: &[(&str, &str)] = &[
+    ("ASCII_DIGIT", "c.is_ascii_digit()"),
+    ("ASCII_NONZERO_DIGIT", "(c.is_ascii_digit() && c != '0')"),
+    ("ASCII_ALPHA_LOWER", "c.is_ascii_lowercase()"),
+    ("ASCII_ALPHA_UPPER", "c.is_ascii_uppercase()"),
+    ("ASCII_ALPHA", "c.is_ascii_alphabetic()"),
+    ("ASCII_ALPHANUMERIC", "c.is_ascii_alphanumeric()"),
+    ("ASCII", "c.is_ascii()"),
+    ("ANY", "true"),
+];
+
 pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
     let formatted_idents = match contains_idents(expr, has_whitespace) {
@@ -13,62 +24,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
     match expr {
         OptimizedExpr::Ident(ident) => {
             match ident.as_str() {
-                "ASCII_DIGIT" => {
-                    format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                        if let Some(first) = input.chars().next() {{
-                            if first.is_ascii_digit() {{
-                                Ok(&input[1..])
-                            }} else {{
-                                Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "ASCII_DIGIT"))
-                            }}
-                        }} else {{
-                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "ASCII_DIGIT"))
-                        }}
-                    }}
-
-                    fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                        if let Some(first) = input.chars().next() {{
-                            if first.is_ascii_digit() {{
-                                Some(&input[1..])
-                            }} else {{
-                                None
-                            }}
-                        }} else {{
-                            None
-                        }}
-                    }}
-
-                    "#)
-                }
-                "ASCII_ALPHANUMERIC" => {
-                    format!(r#"
-                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                        if let Some(first) = input.chars().next() {{
-                            if first.is_ascii_alphanumeric() {{
-                                Ok(&input[1..])
-                            }} else {{
-                                Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input, "ASCII_ALPHANUMERIC"))
-                            }}
-                        }} else {{
-                            Err(Error::new(ErrorKind::Expected("ASCII alphanumeric"), input, "ASCII_ALPHANUMERIC"))
-                        }}
-                    }}
-
-                    fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                        if let Some(first) = input.chars().next() {{
-                            if first.is_ascii_alphanumeric() {{
-                                Some(&input[1..])
-                            }} else {{
-                                None
-                            }}
-                        }} else {{
-                            None
-                        }}
-                    }}
-
-                    "#)
-                }
                 "EOI" => {
                     format!(r#"
                     fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
@@ -125,12 +80,78 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
                     "#)
                 }
-                _ => String::new()
+                other => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == &other) {
+                    format!(r#"
+                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
+                        if let Some(c) = input.chars().next() {{
+                            if {c} {{
+                                Ok(&input[1..])
+                            }} else {{
+                                Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{other}"))
+                            }}
+                        }} else {{
+                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{other}"))
+                        }}
+                    }}
+    
+                    fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                        if let Some(c) = input.chars().next() {{
+                            if {c} {{
+                                Some(&input[1..])
+                            }} else {{
+                                None
+                            }}
+                        }} else {{
+                            None
+                        }}
+                    }}
+                    "#)
+                } else {String::new()}
             }
         }
         OptimizedExpr::Choice(_, _) => {
             let mut choices = Vec::new();
             list_choices(expr, &mut choices);
+
+            // If all choices are one character literals or character selectors, group them together
+            let mut simple_conditions = Vec::new();
+            for choice in &choices {
+                match choice {
+                    OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == '{s}'")),
+                    OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
+                        simple_conditions.push(c.to_string());
+                    }
+                    _ => break,
+                }
+            }
+            if simple_conditions.len() == choices.len() {
+                let condition = simple_conditions.join(" || ");
+                return format!(r#"
+                fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
+                    if let Some(c) = input.chars().next() {{
+                        if {condition} {{
+                            Ok(&input[1..])
+                        }} else {{
+                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "c such as {condition}"))
+                        }}
+                    }} else {{
+                        Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "c such as {condition}"))
+                    }}
+                }}
+
+                fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                    if let Some(c) = input.chars().next() {{
+                        if {condition} {{
+                            Some(&input[1..])
+                        }} else {{
+                            None
+                        }}
+                    }} else {{
+                        None
+                    }}
+                }}
+                "#)
+            }
 
             let mut code = String::new();
             let mut quick_code = String::new();
