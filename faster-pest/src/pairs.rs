@@ -73,10 +73,9 @@ impl<'i, I: IdentTrait> Pair2<'i, I> {
 
 impl<'i, I: IdentTrait> std::fmt::Debug for Pair2<'i, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Pair2")
-            .field("rule", &self.as_rule())
+        f.debug_struct(&format!("{:?}", self.as_rule()))
             .field("text", &self.as_str())
-            .field("range", &self.range)
+            //.field("range", &self.range)
             .field("inner", &self.inner())
             .finish()
     }
