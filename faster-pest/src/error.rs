@@ -7,14 +7,16 @@ const BOLD: &str = "\x1b[1m";
 pub enum ErrorKind {
     ExpectedValue(&'static str),
     Expected(&'static str),
+    NegPredFailed(&'static str),
     All(Vec<Error>)
 }
 
 impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ErrorKind::ExpectedValue(expected) => write!(f, "Expected value: {}", expected),
-            ErrorKind::Expected(expected) => write!(f, "Expected: {}", expected),
+            ErrorKind::ExpectedValue(expected) => write!(f, "Expected value: {expected}"),
+            ErrorKind::Expected(expected) => write!(f, "Expected: {expected}"),
+            ErrorKind::NegPredFailed(not_expected) => write!(f, "Negated predicate failed: {not_expected}"),
             ErrorKind::All(errors) => write!(f, "All {} accepted patterns fail to match", errors.len()),
         }
     }

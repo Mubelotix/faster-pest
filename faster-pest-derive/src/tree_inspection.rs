@@ -22,7 +22,7 @@ pub fn list_exprs(expr: &OptimizedExpr, ignore_self: bool) -> Vec<&OptimizedExpr
 
 pub fn contains_idents(expr: &OptimizedExpr, has_whitespace: bool) -> bool {
     match expr {
-        OptimizedExpr::Ident(ident) if ident != "ASCII_DIGIT" && ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && ident != "ASCII_ALPHANUMERIC" => {
+        OptimizedExpr::Ident(ident) if ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && !crate::expr_codegen::CONDITIONS.iter().any(|(n,_)| n==ident) => {
             true
         },
         OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, has_whitespace),

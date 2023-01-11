@@ -1,6 +1,6 @@
 use crate::*;
 
-const CONDITIONS: &[(&str, &str)] = &[
+pub const CONDITIONS: &[(&str, &str)] = &[
     ("ASCII_DIGIT", "c.is_ascii_digit()"),
     ("ASCII_NONZERO_DIGIT", "(c.is_ascii_digit() && c != '0')"),
     ("ASCII_ALPHA_LOWER", "c.is_ascii_lowercase()"),
@@ -10,6 +10,26 @@ const CONDITIONS: &[(&str, &str)] = &[
     ("ASCII", "c.is_ascii()"),
     ("ANY", "true"),
 ];
+
+fn to_pest(expr: &OptimizedExpr) -> String {
+    match expr {
+        OptimizedExpr::Str(s) => format!("{s:?}"),
+        OptimizedExpr::Insens(s) => format!("^{s:?}"),
+        OptimizedExpr::Range(s, e) => format!("'{s}'..'{e}'"),
+        OptimizedExpr::Ident(i) => i.to_owned(),
+        OptimizedExpr::PeekSlice(_, _) => todo!(),
+        OptimizedExpr::PosPred(e) => format!("&{}", to_pest(e)),
+        OptimizedExpr::NegPred(e) => format!("!{}", to_pest(e)),
+        OptimizedExpr::Seq(f, s) if matches!(s.as_ref(), OptimizedExpr::Rep(s) if f == s) => format!("{}+", to_pest(f)),
+        OptimizedExpr::Seq(f, s) => format!("({} ~ {})", to_pest(f), to_pest(s)),
+        OptimizedExpr::Choice(f, s) => format!("({} | {})", to_pest(f), to_pest(s)),
+        OptimizedExpr::Opt(e) => format!("{}?", to_pest(e)),
+        OptimizedExpr::Rep(e) => format!("{}*", to_pest(e)),
+        OptimizedExpr::Skip(_) => todo!(),
+        OptimizedExpr::Push(_) => todo!(),
+        OptimizedExpr::RestoreOnErr(_) => todo!(),
+    }
+}
 
 pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
@@ -21,6 +41,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
         true => ("let idents_len = idents.len();", "idents.truncate(idents_len);", "idents"),
         false => ("", "", ""),
     };
+    let human_readable_expr = to_pest(expr);
     match expr {
         OptimizedExpr::Ident(ident) => {
             match ident.as_str() {
@@ -33,7 +54,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                             Err(Error::new(ErrorKind::Expected("EOI"), input, "EOI"))
                         }}
                     }}
-
                     fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                         if input.is_empty() {{
                             Some(input)
@@ -49,7 +69,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                         Ok(input)
                     }}
-
                     fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                         Some(input)
                     }}
@@ -67,7 +86,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                             Err(Error::new(ErrorKind::Expected("newline"), input, "NEWLINE"))
                         }}
                     }}
-
                     fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                         if input.starts_with("\r\n") {{
                             Some(&input[2..])
@@ -82,10 +100,11 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 }
                 other => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == &other) {
                     format!(r#"
+                    // {other}
                     fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                        if let Some(c) = input.chars().next() {{
+                        if let Some(c) = input.as_bytes().first() {{
                             if {c} {{
-                                Ok(&input[1..])
+                                Ok(unsafe {{ input.get_unchecked(1..) }})
                             }} else {{
                                 Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{other}"))
                             }}
@@ -93,11 +112,10 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                             Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{other}"))
                         }}
                     }}
-    
                     fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                        if let Some(c) = input.chars().next() {{
+                        if let Some(c) = input.as_bytes().first() {{
                             if {c} {{
-                                Some(&input[1..])
+                                Some(unsafe {{ input.get_unchecked(1..) }})
                             }} else {{
                                 None
                             }}
@@ -127,6 +145,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             if simple_conditions.len() == choices.len() {
                 let condition = simple_conditions.join(" || ");
                 return format!(r#"
+                // {condition}
                 fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                     if let Some(c) = input.chars().next() {{
                         if {condition} {{
@@ -138,7 +157,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                         Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "c such as {condition}"))
                     }}
                 }}
-
                 fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                     if let Some(c) = input.chars().next() {{
                         if {condition} {{
@@ -169,13 +187,13 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             }
 
             format!(r#"
+            // {human_readable_expr}
             fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
             {code}
             {error_code}
                 {cancel2}
                 Err(Error::new(ErrorKind::All(errors), input, "choice {id}"))
             }}
-
             fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
             {quick_code}
                 {cancel2}
@@ -186,6 +204,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
         }
         OptimizedExpr::Str(value) => {
             format!(r#"
+            // {human_readable_expr}
             fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                 if input.starts_with({value:?}) {{
                     Ok(&input[{value:?}.len()..])
@@ -193,7 +212,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     Err(Error::new(ErrorKind::ExpectedValue({value:?}), input, "{id}"))
                 }}
             }}
-
             fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
                 if input.starts_with({value:?}) {{
                     Some(&input[{value:?}.len()..])
@@ -237,11 +255,11 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
 
             format!(r#"
+            // {human_readable_expr}
             fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
             {code}
                 Ok(input)
             }}
-
             fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
             {quick_code}
                 Some(input)
@@ -262,6 +280,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             };
 
             format!(r#"
+            // {human_readable_expr}
             fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                     input = new_input;
@@ -269,7 +288,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 }}
                 Ok(input)
             }}
-
             fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
                 while let Some(new_input) = quick_parse_{expr_id}(input, {idents}) {{
                     input = new_input;
@@ -284,6 +302,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             let expr_id = ids.id(expr);
 
             format!(r#"
+            // {human_readable_expr}
             fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 {cancel1}
                 if let Ok(input) = parse_{expr_id}(input, {idents}) {{
@@ -293,7 +312,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     Ok(input)
                 }}
             }}
-
             fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
                 {cancel1}
                 if let Some(input) = quick_parse_{expr_id}(input, {idents}) {{
@@ -301,6 +319,31 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 }} else {{
                     {cancel2}
                     Some(input)
+                }}
+            }}
+            "#)
+        }
+        OptimizedExpr::NegPred(expr) => {
+            let expr_id = ids.id(expr);
+
+            format!(r#"
+            // {human_readable_expr}
+            fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+                {cancel1}
+                if parse_{expr_id}(input, {idents}).is_err() {{
+                    {cancel2}
+                    Ok(input)
+                }} else {{
+                    Err(Error::new(ErrorKind::NegPredFailed("{expr_id}"), input, "{id}"))
+                }}
+            }}
+            fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                {cancel1}
+                if quick_parse_{expr_id}(input, {idents}).is_none() {{
+                    {cancel2} // TODO: remove this
+                    Some(input)
+                }} else {{
+                    None
                 }}
             }}
             "#)
