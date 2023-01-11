@@ -41,7 +41,8 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
         true => ("let idents_len = idents.len();", "idents.truncate(idents_len);", "idents"),
         false => ("", "", ""),
     };
-    let human_readable_expr = to_pest(expr);
+    let hr_expr = to_pest(expr);
+    let hr_expre = hr_expr.replace('\\', "\\\\").replace('\"', "\\\"");
     match expr {
         OptimizedExpr::Ident(ident) => {
             match ident.as_str() {
@@ -151,10 +152,10 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                         if {condition} {{
                             Ok(&input[1..])
                         }} else {{
-                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "c such as {condition}"))
+                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{id} {condition}"))
                         }}
                     }} else {{
-                        Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "c such as {condition}"))
+                        Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{id} {condition}"))
                     }}
                 }}
                 fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
@@ -187,12 +188,12 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             }
 
             format!(r#"
-            // {human_readable_expr}
+            // {hr_expr}
             fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
             {code}
             {error_code}
                 {cancel2}
-                Err(Error::new(ErrorKind::All(errors), input, "choice {id}"))
+                Err(Error::new(ErrorKind::All(errors), input, "{id} {hr_expre}"))
             }}
             fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
             {quick_code}
@@ -204,12 +205,12 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
         }
         OptimizedExpr::Str(value) => {
             format!(r#"
-            // {human_readable_expr}
+            // {hr_expr}
             fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
                 if input.starts_with({value:?}) {{
                     Ok(&input[{value:?}.len()..])
                 }} else {{
-                    Err(Error::new(ErrorKind::ExpectedValue({value:?}), input, "{id}"))
+                    Err(Error::new(ErrorKind::ExpectedValue({value:?}), input, "{id} {hr_expre}"))
                 }}
             }}
             fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
@@ -235,7 +236,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     true => "idents",
                     false => "",
                 };
-                code.push_str(&format!("    input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"){note_for_next})?;\n"));
+                code.push_str(&format!("    input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"{id}-{i} {hr_expre}\"){note_for_next})?;\n"));
                 quick_code.push_str(&format!("    input = quick_parse_{bid}(input, {idents})?;\n"));
                 if has_whitespace {
                     code.push_str("    while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
@@ -244,7 +245,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 match seq {
                     OptimizedExpr::Rep(rep) => {
                         let id = ids.id(rep);
-                        note_for_next = format!(".with_note(\"following sequence {id} which ended\")")
+                        note_for_next = format!(".with_note(\"following sequence {id} {}* which ended\")", to_pest(rep))
                     }
                     OptimizedExpr::Ident(i) if !CONDITIONS.iter().any(|(n,_)| n==i) => {
                         note_for_next = format!(".with_note(\"following {i} which ended\")") // TODO: display if it contains a sequence
@@ -255,7 +256,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
 
             format!(r#"
-            // {human_readable_expr}
+            // {hr_expr}
             fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
             {code}
                 Ok(input)
@@ -280,7 +281,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             };
 
             format!(r#"
-            // {human_readable_expr}
+            // {hr_expr}
             fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                     input = new_input;
@@ -302,7 +303,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             let expr_id = ids.id(expr);
 
             format!(r#"
-            // {human_readable_expr}
+            // {hr_expr}
             fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 {cancel1}
                 if let Ok(input) = parse_{expr_id}(input, {idents}) {{
@@ -327,14 +328,14 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             let expr_id = ids.id(expr);
 
             format!(r#"
-            // {human_readable_expr}
+            // {hr_expr}
             fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
                 {cancel1}
                 if parse_{expr_id}(input, {idents}).is_err() {{
                     {cancel2}
                     Ok(input)
                 }} else {{
-                    Err(Error::new(ErrorKind::NegPredFailed("{expr_id}"), input, "{id}"))
+                    Err(Error::new(ErrorKind::NegPredFailed("{expr_id}"), input, "{id} {hr_expre}"))
                 }}
             }}
             fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
