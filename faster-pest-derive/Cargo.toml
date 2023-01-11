@@ -8,4 +8,6 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
+syn = "1.0"
+proc-macro2 = "1.0"
 pest_meta = "2.5.2"

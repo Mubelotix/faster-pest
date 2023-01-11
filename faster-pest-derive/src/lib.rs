@@ -366,12 +366,25 @@ impl HackTrait for OptimizedExpr {
     }
 }
 
-#[proc_macro_attribute]
-pub fn grammar(attr: TokenStream, tokens: TokenStream) -> TokenStream {
-    let mut grammar_path = attr.to_string();
-    grammar_path.remove(0);
-    grammar_path.remove(grammar_path.len() - 1);
-    let Ok(grammar) = std::fs::read_to_string(&grammar_path) else {
+use syn::*;
+use proc_macro2::TokenTree;
+
+#[proc_macro_derive(Parser, attributes(grammar))]
+pub fn derive_parser(input: TokenStream) -> TokenStream {
+    let input_clone = input.clone();
+    let ast = parse_macro_input!(input_clone as DeriveInput);
+    let mut grammar_tokens = ast.attrs.iter().find(|attr| attr.path.is_ident("grammar")).unwrap().tokens.clone().into_iter();
+    match grammar_tokens.next() {
+        Some(TokenTree::Punct(punct)) if punct.as_char() == '=' => (),
+        _ => panic!("Expected leading '=' in grammar attribute"),
+    }
+    let grammar_path = match grammar_tokens.next() {
+        Some(TokenTree::Literal(value)) => value.to_string(),
+        _ => panic!("Expected literal in grammar attribute")
+    };
+    let grammar_path = grammar_path.trim_matches('"');
+
+    let Ok(grammar) = std::fs::read_to_string(grammar_path) else {
         panic!("Could not read grammar file at {grammar_path:?}");
     };
     let (_, rules) = match pest_meta::parse_and_optimize(&grammar) {
@@ -528,5 +541,5 @@ pub fn grammar(attr: TokenStream, tokens: TokenStream) -> TokenStream {
     }
     println!("{full_code}");
 
-    format!("{tokens} {full_code}").parse().unwrap()
+    format!("{full_code}").parse().unwrap()
 }

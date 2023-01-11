@@ -1,6 +1,7 @@
 use faster_pest::*;
 
-#[grammar("faster-pest/tests/csv.pest")]
+#[derive(Parser)]
+#[grammar = "faster-pest/tests/csv.pest"]
 struct CSVParser {
 
 }

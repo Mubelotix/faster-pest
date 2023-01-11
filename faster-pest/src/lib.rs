@@ -1,4 +1,4 @@
-pub use faster_pest_derive::grammar;
+pub use faster_pest_derive::Parser;
 
 mod error;
 pub use error::*;
