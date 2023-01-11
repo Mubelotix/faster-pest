@@ -237,7 +237,38 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
             "#)
         }
-        OptimizedExpr::Seq(_, _) => {
+        OptimizedExpr::Seq(f, s) => {
+            // If we loop over a character selector, optimize this away
+            if s.as_ref() == &OptimizedExpr::Rep(f.to_owned()) && matches!(f.as_ref(), OptimizedExpr::Choice(_, _)) {
+                let mut choices = Vec::new();
+                list_choices(f, &mut choices);
+                let mut simple_conditions = Vec::new();
+                for choice in &choices {
+                    match choice {
+                        OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
+                        OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
+                            simple_conditions.push(c.to_string());
+                        }
+                        _ => break,
+                    }
+                }
+                if simple_conditions.len() == choices.len() {
+                    let condition = simple_conditions.join(" || ");
+                    return format!(r#"
+                    // {hr_expr}
+                    fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+                        let i = input.as_bytes().iter().position(|c| !({condition})).ok_or_else(|| Error::new(ErrorKind::Expected("{condition}"), input, "{id} ({condition})+"))?;
+                        Ok(unsafe {{ input.get_unchecked(i..) }})
+                    }}
+                    fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                        let i = input.as_bytes().iter().position(|c| !({condition}))?;
+                        Some(unsafe {{ input.get_unchecked(i..) }})
+                    }}
+        
+                    "#);
+                }
+            }
+
             let mut seq = Vec::new();
             list_seq(expr, &mut seq);
 
