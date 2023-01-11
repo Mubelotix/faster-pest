@@ -1,5 +1,5 @@
+use crate::*;
 use std::collections::HashMap;
-use pest_meta::optimizer::OptimizedExpr;
 
 pub struct IdRegistry {
     ids: HashMap<String, usize>,
