@@ -255,10 +255,12 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 match seq {
                     OptimizedExpr::Rep(rep) => {
                         let id = ids.id(rep);
-                        note_for_next = format!(".with_note(\"following sequence {id} {}* which ended\")", to_pest(rep))
+                        let hr_rep = to_pest(rep);
+                        let hr_repe = hr_rep.replace('\\', "\\\\").replace('"', "\\\"");
+                        note_for_next = format!(".with_note(\"following sequence {id} {hr_repe}* which ended\")");
                     }
                     OptimizedExpr::Ident(i) if !CONDITIONS.iter().any(|(n,_)| n==i) => {
-                        note_for_next = format!(".with_note(\"following {i} which ended\")") // TODO: display if it contains a sequence
+                        note_for_next = format!(".with_note(\"following {i} which ended\")"); // TODO: display if it contains a sequence
                     }
                     _ => note_for_next.clear(),
                 }
