@@ -209,6 +209,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             list_seq(expr, &mut seq);
 
             let mut code = String::new();
+            let mut note_for_next = String::new();
             let mut quick_code = String::new();
             for (i, seq) in seq.iter().enumerate() {
                 let bid = ids.id(seq);
@@ -216,11 +217,21 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     true => "idents",
                     false => "",
                 };
-                code.push_str(&format!("    input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"))?;\n"));
+                code.push_str(&format!("    input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"sequence {id} arm {i}\"){note_for_next})?;\n"));
                 quick_code.push_str(&format!("    input = quick_parse_{bid}(input, {idents})?;\n"));
                 if has_whitespace {
                     code.push_str("    while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
                     quick_code.push_str("    while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }\n");
+                }
+                match seq {
+                    OptimizedExpr::Rep(rep) => {
+                        let id = ids.id(rep);
+                        note_for_next = format!(".with_note(\"following sequence {id} which ended\")")
+                    }
+                    OptimizedExpr::Ident(i) if !CONDITIONS.iter().any(|(n,_)| n==i) => {
+                        note_for_next = format!(".with_note(\"following {i} which ended\")") // TODO: display if it contains a sequence
+                    }
+                    _ => note_for_next.clear(),
                 }
             }
 

@@ -1,6 +1,7 @@
-const RED: &str = "\x1b[31m";
+const RED: &str = "\x1b[31;1m";
 const NORMAL: &str = "\x1b[0m";
-const BLUE: &str = "\x1b[34m";
+const BLUE: &str = "\x1b[34;1m";
+const BOLD: &str = "\x1b[1m";
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -24,6 +25,7 @@ pub struct Error {
     kind: ErrorKind,
     remaining_bytes: usize,
     trace: Vec<String>,
+    note: Option<String>,
 }
 
 impl Error {
@@ -32,11 +34,19 @@ impl Error {
             kind,
             remaining_bytes: input.len(),
             trace: vec![root.into()],
+            note: None,
         }
     }
 
     pub fn with_trace(mut self, trace: impl Into<String>) -> Self {
         self.trace.push(trace.into());
+        self
+    }
+
+    pub fn with_note(mut self, note: impl Into<String>) -> Self {
+        if self.note.is_none() {
+            self.note = Some(note.into());
+        }
         self
     }
 
@@ -56,7 +66,10 @@ impl Error {
         println!("   {BLUE}|{NORMAL}");
         println!("{:>3}{BLUE}|{NORMAL} {}", line_number, &input[line_start..line_end]);
         println!("   {BLUE}|{NORMAL} {}{RED}^{NORMAL}", " ".repeat(position_in_utf8_line));
-        println!("   {BLUE}= {NORMAL}note: {}", self.trace.join(", "));
+        if let Some(note) = &self.note {
+            println!("   {BLUE}= {NORMAL}{BOLD}note{NORMAL}: {note}");
+        }
+        println!("   {BLUE}= {NORMAL}{BOLD}trace{NORMAL}: {}", self.trace.join(", "));
     }
 
     pub fn into_pest<Rule: pest::RuleType>(self, input: &str) -> pest::error::Error<Rule> {
