@@ -23,12 +23,16 @@ pub struct Pair2<'i, I: IdentTrait> {
 }
 
 impl<'i, I: IdentTrait> Pair2<'i, I> {
+    pub(crate) fn ident(&self) -> &I {
+        self.all_idents.get(self.start).unwrap()
+    }
+
     pub fn as_rule(&self) -> I::Rule {
-        self.all_idents[self.start].as_rule()
+        self.ident().as_rule()
     }
 
     pub fn as_str(&self) -> &str {
-        self.all_idents[self.start].as_str()
+        self.ident().as_str()
     }
 
     #[deprecated = "Please use as_span instead"]
