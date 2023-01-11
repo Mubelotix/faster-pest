@@ -456,7 +456,8 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     full_code.push_str("}\n\n");
 
     // Create parse method TODO name
-    full_code.push_str("impl CSVParser {\n");
+    full_code.push_str("#[automatically_derived]\n");
+    full_code.push_str(&format!("impl {} {{\n", ast.ident));
     full_code.push_str("    pub fn parse(rule: Rule, input: &str) -> Result<Pairs2<Ident>, Error> {\n");
     full_code.push_str("        let mut idents = Vec::new();\n");
     full_code.push_str("        match rule {\n");
