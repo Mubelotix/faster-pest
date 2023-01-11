@@ -58,4 +58,13 @@ impl Error {
         println!("   {BLUE}|{NORMAL} {}{RED}^{NORMAL}", " ".repeat(position_in_utf8_line));
         println!("   {BLUE}= {NORMAL}note: {}", self.trace.join(", "));
     }
+
+    pub fn into_pest<Rule: pest::RuleType>(self, input: &str) -> pest::error::Error<Rule> {
+        pest::error::Error::new_from_pos(
+            pest::error::ErrorVariant::CustomError {
+                message: format!("{}", self.kind),
+            },
+            pest::Position::new(input, input.len() - self.remaining_bytes).unwrap()
+        )
+    }
 }
