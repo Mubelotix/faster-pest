@@ -21,8 +21,18 @@ fn to_pest(expr: &OptimizedExpr) -> String {
         OptimizedExpr::PosPred(e) => format!("&{}", to_pest(e)),
         OptimizedExpr::NegPred(e) => format!("!{}", to_pest(e)),
         OptimizedExpr::Seq(f, s) if matches!(s.as_ref(), OptimizedExpr::Rep(s) if f == s) => format!("{}+", to_pest(f)),
-        OptimizedExpr::Seq(f, s) => format!("({} ~ {})", to_pest(f), to_pest(s)),
-        OptimizedExpr::Choice(f, s) => format!("({} | {})", to_pest(f), to_pest(s)),
+        OptimizedExpr::Seq(f, s) => {
+            // TODO: This breaks ()+ detection
+            /*let mut choices = Vec::new();
+            list_seq(expr, &mut choices);
+            format!("({})", choices.iter().map(|c| to_pest(c)).collect::<Vec<_>>().join(" ~ "))*/
+            format!("({} ~ {})", to_pest(f), to_pest(s))
+        },
+        OptimizedExpr::Choice(_, _) => {
+            let mut choices = Vec::new();
+            list_choices(expr, &mut choices);
+            format!("({})", choices.iter().map(|c| to_pest(c)).collect::<Vec<_>>().join(" | "))
+        },
         OptimizedExpr::Opt(e) => format!("{}?", to_pest(e)),
         OptimizedExpr::Rep(e) => format!("{}*", to_pest(e)),
         OptimizedExpr::Skip(_) => todo!(),
