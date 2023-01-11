@@ -124,31 +124,37 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             false => full_code.push_str(&format!(r#"
                 fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Result<&'i str, Error> {{
                     let idents_len = idents.len();
-                    idents.push(Ident::{rule_name_pascal_case}(""));
+                    if idents_len == idents.capacity() {{
+                        idents.reserve(500);
+                    }}
+                    unsafe {{ idents.set_len(idents_len + 1); }}
                     let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
                         Ok(input) => input,
                         Err(e) => {{
-                            idents.truncate(idents_len);
+                            unsafe {{ idents.set_len(idents_len); }}
                             return Err(e);
                         }}
                     }};
-                    let new_ident = &input[..input.len() - new_input.len()];
-                    idents[idents_len] = Ident::{rule_name_pascal_case}(new_ident);
+                    let new_ident = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
+                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(new_ident); }}
                     Ok(new_input)
                 }}
 
                 fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Option<&'i str> {{
                     let idents_len = idents.len();
-                    idents.push(Ident::{rule_name_pascal_case}(""));
+                    if idents_len == idents.capacity() {{
+                        idents.reserve(500);
+                    }}
+                    unsafe {{ idents.set_len(idents_len + 1); }}
                     let new_input = match quick_parse_{top_expr_id}(input, {formatted_idents}) {{
                         Some(input) => input,
                         None => {{
-                            idents.truncate(idents_len);
+                            unsafe {{ idents.set_len(idents_len); }}
                             return None;
                         }}
                     }};
-                    let new_ident = &input[..input.len() - new_input.len()];
-                    idents[idents_len] = Ident::{rule_name_pascal_case}(new_ident);
+                    let new_ident = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
+                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(new_ident); }}
                     Some(new_input)
                 }}
                 "#)
