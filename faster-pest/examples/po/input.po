@@ -1,8 +1,12 @@
+msgid ""
+msgstr ""
+    "Language: en\n"
+
 msgid "This was a triumph."
 msgstr "C'était un triomphe."
 
 msgid  "I'm making a note here: huge success."
-msgstr "J'en prend note ici: énorme succès."
+msgstr "J'en prend note ici: énorme succès." 
 
 msgid "It's hard to overstate my satisfaction."
 msgstr "Il est difficile de surévaluer ma satisfaction."
@@ -10,7 +14,9 @@ msgstr "Il est difficile de surévaluer ma satisfaction."
 msgid "Aperture Science"
 msgstr ""
 
-msgid "We do what we must - because - we can."
+msgid "We do what we must"
+    " because"
+    " we can."
 msgstr "On fait notre devoir, car c'est notre pouvoir."
 
 msgid "For the good of all of us..."
