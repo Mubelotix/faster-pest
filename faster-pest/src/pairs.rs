@@ -18,14 +18,13 @@ pub struct Tokens2 {
 #[derive(Debug, Clone)]
 pub struct Pair2<'i, I: IdentTrait> {
     all_idents: Rc<Vec<I>>,
+    ident_range: std::ops::Range<usize>,
     initial_text: &'i str,
-    start: usize,
-    end: usize,
 }
 
 impl<'i, I: IdentTrait> Pair2<'i, I> {
     pub(crate) fn ident(&self) -> &I {
-        self.all_idents.get(self.start).unwrap()
+        self.all_idents.get(self.ident_range.start).unwrap()
     }
 
     pub fn as_rule(&self) -> I::Rule {
@@ -52,7 +51,7 @@ impl<'i, I: IdentTrait> Pair2<'i, I> {
     pub fn into_inner(self) -> Pairs2<'i, I> {
         Pairs2 {
             all_idents: Rc::clone(&self.all_idents),
-            ident_range: self.start + 1..self.end,
+            ident_range: self.ident_range.start + 1..self.ident_range.end,
             initial_text: self.initial_text,
             i: 0,
         }
@@ -108,8 +107,7 @@ impl<'i, I: IdentTrait + 'i> Iterator for Pairs2<'i, I> {
         Some(Pair2 {
             all_idents: Rc::clone(&self.all_idents),
             initial_text: self.initial_text,
-            start,
-            end
+            ident_range: start..end,
         })
     }
 }
