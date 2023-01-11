@@ -1,36 +1,9 @@
-use std::collections::HashMap;
 use pest_meta::{optimizer::OptimizedExpr, ast::RuleType};
 extern crate proc_macro;
 use proc_macro::TokenStream;
 
-struct IdRegistry {
-    ids: HashMap<String, usize>,
-    next: usize,
-}
-
-impl IdRegistry {
-    fn new() -> Self {
-        Self {
-            ids: HashMap::new(),
-            next: 0,
-        }
-    }
-
-    fn id(&mut self, expr: &OptimizedExpr) -> String {
-        match expr {
-            OptimizedExpr::Ident(ident) => ident.to_string(),
-            expr => {
-                let id = format!("{:?}", expr);
-                let id = self.ids.entry(id).or_insert_with(|| {
-                    let id = self.next;
-                    self.next += 1;
-                    id
-                });
-                format!("anon_{id}")
-            }
-        }
-    }
-}
+mod ids;
+use ids::*;
 
 fn extract_exprs(expr: &OptimizedExpr, ignore_self: bool) -> Vec<&OptimizedExpr> {
     let mut exprs = Vec::new();
@@ -365,8 +338,7 @@ use proc_macro2::TokenTree;
 
 #[proc_macro_derive(Parser, attributes(grammar))]
 pub fn derive_parser(input: TokenStream) -> TokenStream {
-    let input_clone = input.clone();
-    let ast = parse_macro_input!(input_clone as DeriveInput);
+    let ast = parse_macro_input!(input as DeriveInput);
     let mut grammar_tokens = ast.attrs.iter().find(|attr| attr.path.is_ident("grammar")).unwrap().tokens.clone().into_iter();
     match grammar_tokens.next() {
         Some(TokenTree::Punct(punct)) if punct.as_char() == '=' => (),
