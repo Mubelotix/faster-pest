@@ -146,7 +146,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             let mut simple_conditions = Vec::new();
             for choice in &choices {
                 match choice {
-                    OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == '{s}'")),
+                    OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
                     OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
                         simple_conditions.push(c.to_string());
                     }
@@ -158,9 +158,9 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 return format!(r#"
                 // {condition}
                 fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                    if let Some(c) = input.chars().next() {{
+                    if let Some(c) = input.as_bytes().first() {{
                         if {condition} {{
-                            Ok(&input[1..])
+                            Ok(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
                             Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{id} {condition}"))
                         }}
@@ -169,9 +169,9 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     }}
                 }}
                 fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                    if let Some(c) = input.chars().next() {{
+                    if let Some(c) = input.as_bytes().first() {{
                         if {condition} {{
-                            Some(&input[1..])
+                            Some(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
                             None
                         }}

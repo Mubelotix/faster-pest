@@ -7,3 +7,6 @@ edition = "2021"
 [dependencies]
 pest = "2.5"
 faster-pest-derive = { path="../faster-pest-derive" }
+
+[dev-dependencies]
+pest_derive = "2.5"

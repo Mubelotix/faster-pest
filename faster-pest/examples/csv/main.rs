@@ -25,7 +25,7 @@ fn main() {
     for record in file.into_inner() {
         match record.as_rule() {
             Rule::record => {
-                record_count += 1;
+                record_count += 1;s
 
                 for field in record.into_inner() {
                     field_sum += field.as_str().parse::<f64>().unwrap();
