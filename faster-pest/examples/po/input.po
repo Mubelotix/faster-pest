@@ -1,7 +1,10 @@
+msgctx
 msgid ""
 msgstr ""
     "Language: en\n"
 
+msgctx "STILL ALIVE"
+    "- by Jonathan Coulton"
 msgid "This was a triumph."
 msgstr "C'était un triomphe."
 
@@ -11,6 +14,7 @@ msgstr "J'en prend note ici: énorme succès."
 msgid "It's hard to overstate my satisfaction."
 msgstr "Il est difficile de surévaluer ma satisfaction."
 
+msgctx 
 msgid "Aperture Science"
 msgstr ""
 
