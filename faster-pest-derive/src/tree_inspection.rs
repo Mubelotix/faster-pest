@@ -1,35 +1,27 @@
-use pest_meta::optimizer::OptimizedExpr;
+use crate::*;
 
-pub fn list_exprs(expr: &OptimizedExpr, ignore_self: bool) -> Vec<&OptimizedExpr> {
+pub fn list_exprs(expr: &FPestExpr) -> Vec<&FPestExpr> {
     let mut exprs = Vec::new();
     match expr {
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Rep(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => exprs.extend(list_exprs(expr, false)),
-        OptimizedExpr::Seq(first, second) => {
-            exprs.extend(list_exprs(first, matches!(**first, OptimizedExpr::Seq(_, _))));
-            exprs.extend(list_exprs(second, matches!(**second, OptimizedExpr::Seq(_, _))));
-        }
-        OptimizedExpr::Choice(first, second) => {
-            exprs.extend(list_exprs(first, matches!(**first, OptimizedExpr::Choice(_, _))));
-            exprs.extend(list_exprs(second, matches!(**second, OptimizedExpr::Choice(_, _))));
-        }
-        _ => ()
+        FPestExpr::NegPred(expr) | FPestExpr::Opt(expr) | FPestExpr::Rep(expr, _) => exprs.extend(list_exprs(expr)),
+        FPestExpr::Seq(items) | FPestExpr::Choice(items) => items.iter().for_each(|i| exprs.extend(list_exprs(i))),
+        FPestExpr::Ident(_) | FPestExpr::Str(_) | FPestExpr::Insens(_) | FPestExpr::CharacterCondition(_) => {},
     }
-    if !ignore_self {
-        exprs.push(expr);
-    }
+    exprs.push(expr);
     exprs
 }
 
-pub fn contains_idents(expr: &OptimizedExpr, has_whitespace: bool) -> bool {
+pub fn contains_idents(expr: &FPestExpr, has_whitespace: bool) -> bool {
     match expr {
-        OptimizedExpr::Ident(ident) if ident != "SOI" && ident != "EOI" && ident != "NEWLINE" && !crate::expr_codegen::CONDITIONS.iter().any(|(n,_)| n==ident) => {
+        FPestExpr::Ident(ident) if ident != "SOI" && ident != "EOI" && ident != "NEWLINE" => {
             true
         },
-        OptimizedExpr::PosPred(expr) | OptimizedExpr::NegPred(expr) | OptimizedExpr::Opt(expr) | OptimizedExpr::Push(expr) | OptimizedExpr::RestoreOnErr(expr) => contains_idents(expr, has_whitespace),
-        OptimizedExpr::Seq(first, second) => has_whitespace || contains_idents(first, has_whitespace) || contains_idents(second, has_whitespace),
-        OptimizedExpr::Choice(first, second) => contains_idents(first, has_whitespace) || contains_idents(second, has_whitespace),
-        OptimizedExpr::Rep(expr) => has_whitespace || contains_idents(expr, has_whitespace),
-        _ => false
+        FPestExpr::NegPred(expr) | FPestExpr::Opt(expr) => contains_idents(expr, has_whitespace),
+        FPestExpr::Seq(items) => has_whitespace || items.iter().any(|i| contains_idents(i, has_whitespace)),
+        FPestExpr::Choice(items) => items.iter().any(|i| contains_idents(i, has_whitespace)),
+        FPestExpr::Rep(expr, _) => has_whitespace || contains_idents(expr, has_whitespace),
+        FPestExpr::Str(_) | FPestExpr::Insens(_) | FPestExpr::CharacterCondition(_) => false,
+        FPestExpr::Ident(_) => false,
     }
 }
 

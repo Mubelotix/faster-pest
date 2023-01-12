@@ -2,6 +2,7 @@ msgctx
 msgid ""
 msgstr ""
     "Language: en\n"
+    "Quote: \"test\""
 
 msgctx "STILL ALIVE"
     "- by Jonathan Coulton"

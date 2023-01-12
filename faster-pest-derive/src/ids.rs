@@ -14,9 +14,9 @@ impl IdRegistry {
         }
     }
 
-    pub fn id(&mut self, expr: &OptimizedExpr) -> String {
+    pub fn id(&mut self, expr: &FPestExpr) -> String {
         match expr {
-            OptimizedExpr::Ident(ident) => ident.to_string(),
+            FPestExpr::Ident(ident) => ident.to_string(),
             expr => {
                 let id = format!("{:?}", expr);
                 let id = self.ids.entry(id).or_insert_with(|| {

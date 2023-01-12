@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{*, optimizer::FPestExpr};
 
 pub const CONDITIONS: &[(&str, &str)] = &[
     ("ASCII_DIGIT", "c.is_ascii_digit()"),
@@ -11,53 +11,22 @@ pub const CONDITIONS: &[(&str, &str)] = &[
     ("ANY", "true"),
 ];
 
-fn to_simple_condition(exprs: &[&OptimizedExpr]) -> Option<String> {
-    let mut simple_conditions = Vec::new();
-    for expr in exprs {
-        match expr {
-            OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
-            OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
-                simple_conditions.push(c.to_string());
-            } else {
-                return None;
-            }
-            _ => return None,
-        }
-    }
-    Some(simple_conditions.join(" || "))
-}
-
-fn to_pest(expr: &OptimizedExpr) -> String {
+fn to_pest(expr: &FPestExpr) -> String {
     match expr {
-        OptimizedExpr::Str(s) => format!("{s:?}"),
-        OptimizedExpr::Insens(s) => format!("^{s:?}"),
-        OptimizedExpr::Range(s, e) => format!("'{s}'..'{e}'"),
-        OptimizedExpr::Ident(i) => i.to_owned(),
-        OptimizedExpr::PeekSlice(_, _) => todo!(),
-        OptimizedExpr::PosPred(e) => format!("&{}", to_pest(e)),
-        OptimizedExpr::NegPred(e) => format!("!{}", to_pest(e)),
-        OptimizedExpr::Seq(f, s) if matches!(s.as_ref(), OptimizedExpr::Rep(s) if f == s) => format!("{}+", to_pest(f)),
-        OptimizedExpr::Seq(f, s) => {
-            // TODO: This breaks ()+ detection
-            /*let mut choices = Vec::new();
-            list_seq(expr, &mut choices);
-            format!("({})", choices.iter().map(|c| to_pest(c)).collect::<Vec<_>>().join(" ~ "))*/
-            format!("({} ~ {})", to_pest(f), to_pest(s))
-        },
-        OptimizedExpr::Choice(_, _) => {
-            let mut choices = Vec::new();
-            list_choices(expr, &mut choices);
-            format!("({})", choices.iter().map(|c| to_pest(c)).collect::<Vec<_>>().join(" | "))
-        },
-        OptimizedExpr::Opt(e) => format!("{}?", to_pest(e)),
-        OptimizedExpr::Rep(e) => format!("{}*", to_pest(e)),
-        OptimizedExpr::Skip(_) => todo!(),
-        OptimizedExpr::Push(_) => todo!(),
-        OptimizedExpr::RestoreOnErr(_) => todo!(),
+        FPestExpr::Str(s) => format!("{s:?}"),
+        FPestExpr::CharacterCondition(c) => format!("({c})"),
+        FPestExpr::Insens(s) => format!("^{s:?}"),
+        FPestExpr::Ident(i) => i.to_owned(),
+        FPestExpr::NegPred(e) => format!("!{}", to_pest(e)),
+        FPestExpr::Seq(exprs) => format!("({})", exprs.iter().map(to_pest).collect::<Vec<_>>().join(" ~ ")),
+        FPestExpr::Choice(exprs) => format!("({})", exprs.iter().map(to_pest).collect::<Vec<_>>().join(" | ")),
+        FPestExpr::Opt(e) => format!("{}?", to_pest(e)),
+        FPestExpr::Rep(e, true) => format!("{}*", to_pest(e)),
+        FPestExpr::Rep(e, false) => format!("{}+", to_pest(e)),
     }
 }
 
-pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
+pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
     let formatted_idents = match contains_idents(expr, has_whitespace) {
         true => "idents: &'b mut Vec<(Ident<'i>, usize)>",
@@ -70,7 +39,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
     let hr_expr = to_pest(expr);
     let hr_expre = hr_expr.replace('\\', "\\\\").replace('\"', "\\\"");
     match expr {
-        OptimizedExpr::Ident(ident) => {
+        FPestExpr::Ident(ident) => {
             match ident.as_str() {
                 "EOI" => {
                     format!(r#"
@@ -125,78 +94,47 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
                     "#)
                 }
-                other => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == &other) {
-                    format!(r#"
-                    // {other}
-                    fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                        if let Some(c) = input.as_bytes().first() {{
-                            if {c} {{
-                                Ok(unsafe {{ input.get_unchecked(1..) }})
-                            }} else {{
-                                Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{other}"))
-                            }}
-                        }} else {{
-                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{other}"))
-                        }}
-                    }}
-                    fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                        if let Some(c) = input.as_bytes().first() {{
-                            if {c} {{
-                                Some(unsafe {{ input.get_unchecked(1..) }})
-                            }} else {{
-                                None
-                            }}
-                        }} else {{
-                            None
-                        }}
-                    }}
-                    "#)
-                } else {String::new()}
+                _ => String::new()
             }
         }
-        OptimizedExpr::Choice(_, _) => {
-            let mut choices = Vec::new();
-            list_choices(expr, &mut choices);
-
-            // If all choices are one character literals or character selectors, group them together
-            if let Some(condition) = to_simple_condition(&choices) {
-                return format!(r#"
-                // {condition}
-                fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                    let b = input.as_bytes();
-                    if !b.is_empty() {{
-                        let c = unsafe {{ b.get_unchecked(0) }};
-                        if {condition} {{
-                            Ok(unsafe {{ input.get_unchecked(1..) }})
-                        }} else {{
-                            Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{id} {condition}"))
-                        }}
+        FPestExpr::CharacterCondition(condition) => {
+            format!(r#"
+            // {condition}
+            fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
+                let b = input.as_bytes();
+                if !b.is_empty() {{
+                    let c = unsafe {{ b.get_unchecked(0) }};
+                    if {condition} {{
+                        Ok(unsafe {{ input.get_unchecked(1..) }})
                     }} else {{
-                        Err(Error::new(ErrorKind::Expected("ASCII digit"), input, "{id} {condition}"))
+                        Err(Error::new(ErrorKind::Expected("unknown"), input, "{id} {hr_expre}")) // TODO: remove unknown
                     }}
+                }} else {{
+                    Err(Error::new(ErrorKind::Expected("unknown"), input, "{id} {hr_expre}"))
                 }}
-                fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                    let b = input.as_bytes();
-                    if !b.is_empty() {{
-                        let c = unsafe {{ b.get_unchecked(0) }};
-                        if {condition} {{
-                            Some(unsafe {{ input.get_unchecked(1..) }})
-                        }} else {{
-                            None
-                        }}
+            }}
+            fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                let b = input.as_bytes();
+                if !b.is_empty() {{
+                    let c = unsafe {{ b.get_unchecked(0) }};
+                    if {condition} {{
+                        Some(unsafe {{ input.get_unchecked(1..) }})
                     }} else {{
                         None
                     }}
+                }} else {{
+                    None
                 }}
-                "#)
-            }
-
+            }}
+            "#)
+        }
+        FPestExpr::Choice(items) => {
             let mut code = String::new();
             let mut quick_code = String::new();
             let mut error_code = String::from("    let mut errors = Vec::new();\n");
-            for (i, choice) in choices.iter().enumerate() {
-                let bid = ids.id(choice);
-                let idents = match contains_idents(choice, has_whitespace) {
+            for (i, item) in items.iter().enumerate() {
+                let bid = ids.id(item);
+                let idents = match contains_idents(item, has_whitespace) {
                     true => "idents",
                     false => "",
                 };
@@ -222,7 +160,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
             "#)
         }
-        OptimizedExpr::Str(value) => {
+        FPestExpr::Str(value) => {
             format!(r#"
             // {hr_expr}
             fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
@@ -242,36 +180,13 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
             "#)
         }
-        OptimizedExpr::Seq(f, s) => {
-            // If we loop over a character selector, optimize this away
-            if s.as_ref() == &OptimizedExpr::Rep(f.to_owned()) && matches!(f.as_ref(), OptimizedExpr::Choice(_, _)) {
-                let mut choices = Vec::new();
-                list_choices(f, &mut choices);
-                if let Some(condition) = to_simple_condition(&choices) {
-                    return format!(r#"
-                    // {hr_expr}
-                    fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).ok_or_else(|| Error::new(ErrorKind::Expected("{condition}"), input, "{id} ({condition})+"))?;
-                        Ok(unsafe {{ input.get_unchecked(i..) }})
-                    }}
-                    fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition}))?;
-                        Some(unsafe {{ input.get_unchecked(i..) }})
-                    }}
-                    
-                    "#);
-                }
-            }
-
-            let mut seq = Vec::new();
-            list_seq(expr, &mut seq);
-
+        FPestExpr::Seq(items) => {
             let mut code = String::new();
             let mut note_for_next = String::new();
             let mut quick_code = String::new();
-            for (i, seq) in seq.iter().enumerate() {
-                let bid = ids.id(seq);
-                let idents = match contains_idents(seq, has_whitespace) {
+            for (i, item) in items.iter().enumerate() {
+                let bid = ids.id(item);
+                let idents = match contains_idents(item, has_whitespace) {
                     true => "idents",
                     false => "",
                 };
@@ -281,14 +196,14 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     code.push_str("    while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
                     quick_code.push_str("    while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }\n");
                 }
-                match seq {
-                    OptimizedExpr::Rep(rep) => {
+                match item {
+                    FPestExpr::Rep(rep, _) => {
                         let id = ids.id(rep);
                         let hr_rep = to_pest(rep);
                         let hr_repe = hr_rep.replace('\\', "\\\\").replace('"', "\\\"");
                         note_for_next = format!(".with_note(\"following sequence {id} {hr_repe}* which ended\")");
                     }
-                    OptimizedExpr::Ident(i) if !CONDITIONS.iter().any(|(n,_)| n==i) => {
+                    FPestExpr::Ident(i) if !CONDITIONS.iter().any(|(n,_)| n==i) => {
                         note_for_next = format!(".with_note(\"following {i} which ended\")"); // TODO: display if it contains a sequence
                     }
                     _ => note_for_next.clear(),
@@ -308,12 +223,9 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             
             "#)
         }
-        OptimizedExpr::Rep(expr) => {
-            // If we loop over a character selector, optimize this away
-            if matches!(expr.as_ref(), OptimizedExpr::Choice(_, _)) {
-                let mut choices = Vec::new();
-                list_choices(expr, &mut choices);
-                if let Some(condition) = to_simple_condition(&choices) {
+        FPestExpr::Rep(expr, empty_accepted) => {
+            if let FPestExpr::CharacterCondition(condition) = &**expr {
+                if *empty_accepted {
                     return format!(r#"
                     // {hr_expr}
                     fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
@@ -322,6 +234,19 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                     }}
                     fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
                         let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(0);
+                        Some(unsafe {{ input.get_unchecked(i..) }})
+                    }}
+                        
+                    "#);
+                } else {
+                    return format!(r#"
+                    // {hr_expr}
+                    fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+                        let i = input.as_bytes().iter().position(|c| !({condition})).ok_or_else(|| Error::new(ErrorKind::Expected("{condition}"), input, "{id} ({condition})+"))?;
+                        Ok(unsafe {{ input.get_unchecked(i..) }})
+                    }}
+                    fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                        let i = input.as_bytes().iter().position(|c| !({condition}))?;
                         Some(unsafe {{ input.get_unchecked(i..) }})
                     }}
                     
@@ -340,9 +265,15 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 false => ("", ""),
             };
 
+            let (non_empty, quick_non_empty) = match empty_accepted {
+                false => (format!("parse_{expr_id}(input, {idents})?;"), format!("quick_parse_{expr_id}(input, {idents})?;")),
+                true => (String::new(), String::new()),
+            };
+
             format!(r#"
             // {hr_expr}
             fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+                {non_empty}
                 while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                     input = new_input;
                     {whitespace}
@@ -350,6 +281,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 Ok(input)
             }}
             fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+                {quick_non_empty}
                 while let Some(new_input) = quick_parse_{expr_id}(input, {idents}) {{
                     input = new_input;
                     {quick_whitespace}
@@ -359,7 +291,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
 
             "#)
         }
-        OptimizedExpr::Opt(expr) => {
+        FPestExpr::Opt(expr) => {
             let expr_id = ids.id(expr);
 
             format!(r#"
@@ -384,7 +316,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             }}
             "#)
         }
-        OptimizedExpr::NegPred(expr) => {
+        FPestExpr::NegPred(expr) => {
             let expr_id = ids.id(expr);
 
             format!(r#"

@@ -8,6 +8,8 @@ mod tree_inspection;
 pub(crate) use tree_inspection::*;
 mod expr_codegen;
 pub(crate) use expr_codegen::*;
+mod optimizer;
+pub(crate) use optimizer::*;
 
 use syn::*;
 use proc_macro2::TokenTree;
@@ -111,13 +113,19 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     full_code.push_str("}\n\n");
 
     let mut ids = IdRegistry::new();
+    let mut optimized_exprs = Vec::new();
     let mut exprs = Vec::new();
     for rule in &rules {
-        exprs.extend(list_exprs(&rule.expr, false));
+        let expr = optimize(&rule.expr);
+        optimized_exprs.push(expr);
+    }
+    for (i, rule) in rules.iter().enumerate() {
+        let expr = optimized_exprs.get(i).unwrap();
+        exprs.extend(list_exprs(expr));
         let rule_name = rule.name.as_str();
         let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
-        let top_expr_id = ids.id(&rule.expr);
-        let formatted_idents = match contains_idents(&rule.expr, has_whitespace) {
+        let top_expr_id = ids.id(expr);
+        let formatted_idents = match contains_idents(expr, has_whitespace) {
             true => "idents",
             false => "",
         };
@@ -185,6 +193,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     }
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();
+    
     for expr in exprs {
         let mut new_code = code(expr, &mut ids, has_whitespace);
         let mut new_code2 = new_code.trim_start_matches('\n');
