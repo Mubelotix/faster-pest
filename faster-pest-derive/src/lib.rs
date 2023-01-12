@@ -135,8 +135,8 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                             return Err(e);
                         }}
                     }};
-                    let new_ident = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
-                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(new_ident); }}
+                    let content = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
+                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(content); }}
                     Ok(new_input)
                 }}
 
@@ -153,8 +153,8 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                             return None;
                         }}
                     }};
-                    let new_ident = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
-                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(new_ident); }}
+                    let content = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
+                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(content); }}
                     Some(new_input)
                 }}
                 "#)
