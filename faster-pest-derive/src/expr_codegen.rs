@@ -11,6 +11,22 @@ pub const CONDITIONS: &[(&str, &str)] = &[
     ("ANY", "true"),
 ];
 
+fn to_simple_condition(exprs: &[&OptimizedExpr]) -> Option<String> {
+    let mut simple_conditions = Vec::new();
+    for expr in exprs {
+        match expr {
+            OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
+            OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
+                simple_conditions.push(c.to_string());
+            } else {
+                return None;
+            }
+            _ => return None,
+        }
+    }
+    Some(simple_conditions.join(" || "))
+}
+
 fn to_pest(expr: &OptimizedExpr) -> String {
     match expr {
         OptimizedExpr::Str(s) => format!("{s:?}"),
@@ -143,18 +159,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             list_choices(expr, &mut choices);
 
             // If all choices are one character literals or character selectors, group them together
-            let mut simple_conditions = Vec::new();
-            for choice in &choices {
-                match choice {
-                    OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
-                    OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
-                        simple_conditions.push(c.to_string());
-                    }
-                    _ => break,
-                }
-            }
-            if simple_conditions.len() == choices.len() {
-                let condition = simple_conditions.join(" || ");
+            if let Some(condition) = to_simple_condition(&choices) {
                 return format!(r#"
                 // {condition}
                 fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
@@ -242,18 +247,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             if s.as_ref() == &OptimizedExpr::Rep(f.to_owned()) && matches!(f.as_ref(), OptimizedExpr::Choice(_, _)) {
                 let mut choices = Vec::new();
                 list_choices(f, &mut choices);
-                let mut simple_conditions = Vec::new();
-                for choice in &choices {
-                    match choice {
-                        OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
-                        OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
-                            simple_conditions.push(c.to_string());
-                        }
-                        _ => break,
-                    }
-                }
-                if simple_conditions.len() == choices.len() {
-                    let condition = simple_conditions.join(" || ");
+                if let Some(condition) = to_simple_condition(&choices) {
                     return format!(r#"
                     // {hr_expr}
                     fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
@@ -264,7 +258,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                         let i = input.as_bytes().iter().position(|c| !({condition}))?;
                         Some(unsafe {{ input.get_unchecked(i..) }})
                     }}
-        
+                    
                     "#);
                 }
             }
@@ -301,7 +295,6 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                 }
             }
 
-
             format!(r#"
             // {hr_expr}
             fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
@@ -312,7 +305,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             {quick_code}
                 Some(input)
             }}
-
+            
             "#)
         }
         OptimizedExpr::Rep(expr) => {
@@ -320,18 +313,7 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
             if matches!(expr.as_ref(), OptimizedExpr::Choice(_, _)) {
                 let mut choices = Vec::new();
                 list_choices(expr, &mut choices);
-                let mut simple_conditions = Vec::new();
-                for choice in &choices {
-                    match choice {
-                        OptimizedExpr::Str(s) if s.len() == 1 => simple_conditions.push(format!("c == &b'{s}'")),
-                        OptimizedExpr::Ident(i) => if let Some((_, c)) = CONDITIONS.iter().find(|(n,_)| n == i) {
-                            simple_conditions.push(c.to_string());
-                        }
-                        _ => break,
-                    }
-                }
-                if simple_conditions.len() == choices.len() {
-                    let condition = simple_conditions.join(" || ");
+                if let Some(condition) = to_simple_condition(&choices) {
                     return format!(r#"
                     // {hr_expr}
                     fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
@@ -342,9 +324,8 @@ pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) ->
                         let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(0);
                         Some(unsafe {{ input.get_unchecked(i..) }})
                     }}
-        
+                    
                     "#);
-        
                 }
             }
 
