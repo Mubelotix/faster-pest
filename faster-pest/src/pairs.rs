@@ -17,14 +17,14 @@ pub struct Tokens2 {
 
 #[derive(Clone)]
 pub struct Pair2<'i, I: IdentTrait> {
-    all_idents: Rc<Vec<I>>,
+    all_idents: Rc<Vec<(I, usize)>>,
     range: std::ops::Range<usize>,
     initial_text: &'i str,
 }
 
 impl<'i, I: IdentTrait> Pair2<'i, I> {
     pub(crate) fn ident(&self) -> &I {
-        self.all_idents.get(self.range.start).unwrap()
+        self.all_idents.get(self.range.start).map(|(i,_)| i).unwrap()
     }
 
     pub fn as_rule(&self) -> I::Rule {
@@ -84,14 +84,14 @@ impl<'i, I: IdentTrait> std::fmt::Debug for Pair2<'i, I> {
 
 #[derive(Clone)]
 pub struct Pairs2<'i, I: IdentTrait> {
-    all_idents: Rc<Vec<I>>,
+    all_idents: Rc<Vec<(I, usize)>>,
     range: std::ops::Range<usize>,
     initial_text: &'i str,
     i: usize,
 }
 
 impl<'i, I: IdentTrait> Pairs2<'i, I> {
-    pub fn from_idents(idents: Vec<I>, initial_text: &'i str) -> Self {
+    pub fn from_idents(idents: Vec<(I, usize)>, initial_text: &'i str) -> Self {
         Self {
             range: 0..idents.len(),
             all_idents: Rc::new(idents),
@@ -109,18 +109,8 @@ impl<'i, I: IdentTrait + 'i> Iterator for Pairs2<'i, I> {
             return None;
         }
         let i = self.i + self.range.start;
-
-        let inner_end = self.all_idents[i].as_str().as_ptr() as usize + self.all_idents[i].as_str().len() - self.initial_text.as_ptr() as usize;
         let start = i;
-        let mut end = i + 1;
-        while let Some(ident) = self.all_idents.get(end) {
-            let ident_start = ident.as_str().as_ptr() as usize - self.initial_text.as_ptr() as usize;
-            if ident_start >= inner_end && (ident_start + ident.as_str().len()) > inner_end {
-                break;
-            }
-            end += 1;
-        }
-
+        let end = self.all_idents[i].1;
         self.i = end - self.range.start;
 
         Some(Pair2 {

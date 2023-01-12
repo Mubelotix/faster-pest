@@ -122,7 +122,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
         };
         match silent_rules.contains(&rule_name) {
             false => full_code.push_str(&format!(r#"
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Result<&'i str, Error> {{
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
                     let idents_len = idents.len();
                     if idents_len == idents.capacity() {{
                         idents.reserve(500);
@@ -136,11 +136,11 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                         }}
                     }};
                     let content = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
-                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(content); }}
+                    unsafe {{ *idents.get_unchecked_mut(idents_len) = (Ident::{rule_name_pascal_case}(content), idents.len()); }}
                     Ok(new_input)
                 }}
 
-                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Option<&'i str> {{
+                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
                     let idents_len = idents.len();
                     if idents_len == idents.capacity() {{
                         idents.reserve(500);
@@ -154,17 +154,17 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                         }}
                     }};
                     let content = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
-                    unsafe {{ *idents.get_unchecked_mut(idents_len) = Ident::{rule_name_pascal_case}(content); }}
+                    unsafe {{ *idents.get_unchecked_mut(idents_len) = (Ident::{rule_name_pascal_case}(content), idents.len()); }}
                     Some(new_input)
                 }}
                 "#)
             ),
             true => full_code.push_str(&format!(r#"
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Result<&'i str, Error> {{
+                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
                     parse_{top_expr_id}(input, {formatted_idents})
                 }}
 
-                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<Ident<'i>>) -> Option<&'i str> {{
+                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
                     quick_parse_{top_expr_id}(input, {formatted_idents})
                 }}
                 "#)

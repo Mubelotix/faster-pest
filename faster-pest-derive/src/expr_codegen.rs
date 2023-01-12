@@ -44,7 +44,7 @@ fn to_pest(expr: &OptimizedExpr) -> String {
 pub fn code(expr: &OptimizedExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
     let formatted_idents = match contains_idents(expr, has_whitespace) {
-        true => "idents: &'b mut Vec<Ident<'i>>",
+        true => "idents: &'b mut Vec<(Ident<'i>, usize)>",
         false => "",
     };
     let (cancel1, cancel2, idents) = match contains_idents(expr, has_whitespace) {
