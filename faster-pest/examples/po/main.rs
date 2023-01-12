@@ -14,16 +14,15 @@ fn main() {
         }
     };
 
-    let file = POParser::parse(Rule::file, &unparsed_file)
-        .map_err(|e| e.print(unparsed_file.as_str())).unwrap()
-        .next().unwrap(); // get and unwrap the `file` rule; never fails
+    let output = POParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).unwrap();
+    let file = output.into_iter().next().unwrap(); // get and unwrap the `file` rule; never fails
 
-    for line in file.into_inner() {
+    for line in file.children() {
         match line.as_rule() {
             Rule::entry => {
                 
 
-                println!("{:#?}", line.inner());
+                println!("{:#?}", line.children());
             }
             //Rule::EOI => (),
             _ => unreachable!(),

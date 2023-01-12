@@ -15,6 +15,7 @@ use proc_macro2::TokenTree;
 #[proc_macro_derive(Parser, attributes(grammar))]
 pub fn derive_parser(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
+    let struct_ident = ast.ident;
     let mut grammar_tokens = ast.attrs.iter().find(|attr| attr.path.is_ident("grammar")).unwrap().tokens.clone().into_iter();
     match grammar_tokens.next() {
         Some(TokenTree::Punct(punct)) if punct.as_char() == '=' => (),
@@ -94,7 +95,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
 
     // Create parse method TODO name
     full_code.push_str("#[automatically_derived]\n");
-    full_code.push_str(&format!("impl {} {{\n", ast.ident));
+    full_code.push_str(&format!("impl {struct_ident} {{\n"));
     full_code.push_str("    pub fn parse(rule: Rule, input: &str) -> Result<Pairs2<Ident>, Error> {\n");
     full_code.push_str("        let mut idents = Vec::with_capacity(500);\n"); // TODO: refine 500
     full_code.push_str("        match rule {\n");
@@ -170,6 +171,17 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                 "#)
             ),
         }
+
+        full_code.push_str(&format!(r#"
+            #[automatically_derived]
+            impl {struct_ident} {{
+                pub fn parse_{rule_name}(input: &str) -> Result<IdentList<Ident>, Error> {{
+                    let mut idents = Vec::with_capacity(500);
+                    parse_{rule_name}(input, &mut idents)?;
+                    Ok(unsafe {{ IdentList::from_idents(idents) }})
+                }}
+            }}"#
+        ));
     }
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();

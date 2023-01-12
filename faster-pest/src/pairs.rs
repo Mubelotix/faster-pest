@@ -1,14 +1,6 @@
 use std::rc::Rc;
-
+use crate::*;
 use pest::*;
-
-pub trait IdentTrait: Copy {
-    type Rule: pest::RuleType;
-
-    fn as_rule(&self) -> Self::Rule;
-    fn as_str(&self) -> &str;
-}
-
 
 /// A [`Pair2`] is a reference to a `Ident` and its children. It mimics pest's [`Pair`](pest::iterators::Pair).  
 /// It is created by [`Pairs2::next`].

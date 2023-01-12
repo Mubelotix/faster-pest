@@ -74,19 +74,18 @@ mod faster_pest {
         };
 
         b.iter(|| black_box({
-            let file = CSVParser::parse(Rule::file, &unparsed_file)
-                .expect("unsuccessful parse")
-                .next().unwrap();
+            let file = CSVParser::parse_file(&unparsed_file).expect("unsuccessful parse");
+            let file = file.into_iter().next().unwrap();
 
             let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
 
-            for record in file.into_inner() {
+            for record in file.children() {
                 match record.as_rule() {
                     Rule::record => {
                         record_count += 1;
 
-                        for field in record.into_inner() {
+                        for field in record.children() {
                             field_sum += field.as_str().parse::<f64>().unwrap();
                         }
                     }
