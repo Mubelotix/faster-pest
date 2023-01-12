@@ -1,7 +1,7 @@
 WSP = _{ " "* }
 
 linecontent = {(
-    (!"\"" ~ !"\\" ~ ANY) | "\\\"" | "\\"
+    (!"\"" ~ !"\\" ~ ANY)+ | "\\\"" | "\\"
 )*}
 line = _{WSP ~ "\"" ~ linecontent ~ "\"" ~ WSP ~ NEWLINE}
 
@@ -12,4 +12,3 @@ msgstr = {"msgstr " ~ (line)+}
 entry = {msgctx? ~ msgid ~ msgstr}
 
 file = {(SOI ~ (entry ~ NEWLINE*)+ ~ EOI)}
-  
