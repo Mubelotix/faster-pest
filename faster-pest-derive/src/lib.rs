@@ -105,7 +105,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
         }
     }
     full_code.push_str("        };\n");
-    full_code.push_str("        Ok(Pairs2::from_idents(idents, input))\n");
+    full_code.push_str("        Ok(unsafe {{ Pairs2::from_idents(idents, input) }})\n");
     full_code.push_str("    }\n");
     full_code.push_str("}\n\n");
 
