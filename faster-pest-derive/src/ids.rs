@@ -24,7 +24,7 @@ impl IdRegistry {
                     self.next += 1;
                     id
                 });
-                format!("anon_{id}")
+                format!("anon_{id:0>4}")
             }
         }
     }

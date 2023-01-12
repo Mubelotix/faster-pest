@@ -119,6 +119,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
         let expr = optimize(&rule.expr);
         optimized_exprs.push(expr);
     }
+    println!("{:#?}", optimized_exprs);
     for (i, rule) in rules.iter().enumerate() {
         let expr = optimized_exprs.get(i).unwrap();
         exprs.extend(list_exprs(expr));
