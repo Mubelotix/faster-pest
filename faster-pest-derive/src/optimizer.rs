@@ -109,11 +109,19 @@ pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
         },
         OptimizedExpr::Opt(expr) => FPestExpr::Opt(Box::new(optimize(expr))),
         OptimizedExpr::Rep(expr) => FPestExpr::Rep(Box::new(optimize(expr)), true),
+        OptimizedExpr::Range(a, b) => {
+            if a.len() == 1 && b.len() == 1 {
+                let a = a.chars().next().unwrap() as u8;
+                let b = b.chars().next().unwrap() as u8;
+                FPestExpr::CharacterCondition(format!("(c >= &{a:?} && c <= &{b:?})"))
+            } else {
+                todo!()
+            }
+        }
         OptimizedExpr::PosPred(_) => todo!(),
         OptimizedExpr::Skip(_) => todo!(),
         OptimizedExpr::Push(_) => todo!(),
         OptimizedExpr::RestoreOnErr(_) => todo!(),
-        OptimizedExpr::Range(_, _) => todo!(),
         OptimizedExpr::PeekSlice(_, _) => todo!(),
     }
 }
