@@ -10,3 +10,5 @@ faster-pest-derive = { path="../faster-pest-derive" }
 
 [dev-dependencies]
 pest_derive = "2.5"
+serde = "1.0"
+serde_json = "1.0"

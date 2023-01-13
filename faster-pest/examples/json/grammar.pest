@@ -1,0 +1,15 @@
+WSP = _{ (" " | "\n" | "\t" | "\r")* }
+
+string = { ((!"\"" ~ !"\\" ~ ANY)+ | ("\\"~("\""|"\\"|"/"|"b"|"f"|"n"|"r"|"t" /* todo u */) ))* }
+outer_string = _{ "\"" ~ string ~ "\"" }
+
+array = { "[" ~ ((value ~ ("," ~ value)* ~ "]") | (WSP ~ "]")) }
+boolean = { "true" | "false" }
+null = { "null" }
+number = { (ASCII_DIGIT | "-" | ".")* }
+
+value = _{ WSP ~ (outer_string | object | array | boolean | null | number) ~ WSP }
+property = { WSP ~ outer_string ~ WSP ~ ":" ~ value }
+object = { ("{" ~ property ~ ("," ~ property)* ~ "}") | ("{" ~ WSP ~ "}") }
+
+file = {(SOI ~ value ~ EOI)}

@@ -16,7 +16,7 @@ mod pest_classic {
     }
 
     #[bench]
-    fn recursive_fibonacci(b: &mut Bencher) {
+    fn csv(b: &mut Bencher) {
         let unparsed_file = match std::fs::read_to_string("faster-pest/examples/csv/input.csv") {
             Ok(s) => s,
             Err(_) => match std::fs::read_to_string("examples/csv/input.csv") {
@@ -64,7 +64,7 @@ mod faster_pest {
     }
 
     #[bench]
-    fn recursive_fibonacci(b: &mut Bencher) {
+    fn csv(b: &mut Bencher) {
         let unparsed_file = match std::fs::read_to_string("faster-pest/examples/csv/input.csv") {
             Ok(s) => s,
             Err(_) => match std::fs::read_to_string("examples/csv/input.csv") {

@@ -55,7 +55,7 @@ pub struct IdentRef<'i, I: IdentTrait> {
 }
 
 impl<'i, I: IdentTrait> IdentRef<'i, I> {
-    pub fn ident(&self) -> &I {
+    pub fn ident(&self) -> &'i I {
         // This is safe if the data is valid.
         // The data is valid because it originally comes from `Pairs2::from_idents`, which is only called with valid data.
         unsafe {
@@ -63,7 +63,7 @@ impl<'i, I: IdentTrait> IdentRef<'i, I> {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'i str {
         self.ident().as_str()
     }
 
