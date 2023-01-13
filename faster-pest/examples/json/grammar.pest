@@ -1,6 +1,7 @@
 WSP = _{ (" " | "\n" | "\t" | "\r")* }
 
-string = { ((!"\"" ~ !"\\" ~ ANY)+ | ("\\"~("\""|"\\"|"/"|"b"|"f"|"n"|"r"|"t" /* todo u */) ))* }
+escaped_char = { "\\"~("\""|"\\"|"/"|"b"|"f"|"n"|"r"|"t" /* todo u */) }
+string = { ((!"\"" ~ !"\\" ~ ANY)+ | escaped_char)* }
 outer_string = _{ "\"" ~ string ~ "\"" }
 
 array = { "[" ~ ((value ~ ("," ~ value)* ~ "]") | (WSP ~ "]")) }

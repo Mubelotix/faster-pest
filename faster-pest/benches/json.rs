@@ -13,7 +13,7 @@ enum Value<'i> {
     Null,
 }
 
-fn json_text_to_string(s: &str) -> Cow<str> {
+fn unescape_str(s: &str) -> Cow<str> {
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < s.len() {
@@ -80,7 +80,7 @@ mod faster_pest_json {
     impl<'i> Value<'i> {
         fn from_ident_ref(value: IdentRef<'i, Ident>) -> Self {
             match value.as_rule() {
-                Rule::string => Value::String(json_text_to_string(value.as_str())),
+                Rule::string => Value::String(unescape(value)),
                 Rule::number => Value::Number(value.as_str().parse().unwrap()),
                 Rule::boolean => Value::Boolean(value.as_str() == "true"),
                 Rule::array => {
@@ -93,17 +93,48 @@ mod faster_pest_json {
                     for property in value.children() {
                         let mut property_children = property.children();
                         let name = property_children.next().unwrap();
-                        let name = json_text_to_string(name.as_str());
+                        let name = unescape(name);
                         let value = property_children.next().unwrap();
                         object.insert(name, Value::from_ident_ref(value));
                     }
                     Value::Object(object)
                 }
                 Rule::null => Value::Null,
-                Rule::property | Rule::file => unreachable!(),
+                Rule::property | Rule::file | Rule::escaped_char => unreachable!(),
             }
         }
-    }    
+    }
+    
+    fn unescape<'i>(s: IdentRef<'i, Ident>) -> Cow<'i, str> {
+        let children_count = s.children_count();
+        if children_count == 0 {
+            return Cow::Borrowed(s.as_str());
+        }
+        let mut unescaped = String::with_capacity(s.as_str().len() - children_count);
+        let mut i = 0;
+        let start_addr = s.as_str().as_ptr() as usize;
+        for escaped_char in s.children() {
+            let end = escaped_char.as_str().as_ptr() as usize - start_addr;
+            unescaped.push_str(s.as_str().get(i..end).unwrap());
+            match unsafe { escaped_char.as_str().as_bytes().get_unchecked(1) } {
+                b'"' => unescaped.push('"'),
+                b'\\' => unescaped.push('\\'),
+                b'/' => unescaped.push('/'),
+                b'b' => unescaped.push('\x08'),
+                b'f' => unescaped.push('\x0c'),
+                b'n' => unescaped.push('\n'),
+                b'r' => unescaped.push('\r'),
+                b't' => unescaped.push('\t'),
+                b'u' => {
+                    // Warning when you implement this, you might want to increase the capacity of the string set above
+                    unimplemented!()
+                }
+                _ => unreachable!()
+            }
+            i = end + 2;
+        }
+        Cow::Owned(unescaped)
+    }
 
     #[derive(Parser)]
     #[grammar = "faster-pest/examples/json/grammar.pest"]
