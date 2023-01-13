@@ -1,6 +1,7 @@
 [package]
 name = "faster-pest"
 authors = ["Mubelotix <mubelotix@gmail>"]
+readme = "../README.md"
 version = "0.1.0"
 edition = "2021"
 
