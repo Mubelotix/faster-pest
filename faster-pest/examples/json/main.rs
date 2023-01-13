@@ -53,7 +53,7 @@ fn unescape<'i>(s: IdentRef<'i, Ident>) -> Cow<'i, str> {
     let start_addr = s.as_str().as_ptr() as usize;
     for escaped_char in s.children() {
         let end = escaped_char.as_str().as_ptr() as usize - start_addr;
-        unescaped.push_str(s.as_str().get(i..end).unwrap());
+        unescaped.push_str(unsafe { s.as_str().get_unchecked(i..end) });
         match unsafe { escaped_char.as_str().as_bytes().get_unchecked(1) } {
             b'"' => unescaped.push('"'),
             b'\\' => unescaped.push('\\'),
@@ -71,6 +71,7 @@ fn unescape<'i>(s: IdentRef<'i, Ident>) -> Cow<'i, str> {
         }
         i = end + 2;
     }
+    unescaped.push_str(unsafe { s.as_str().get_unchecked(i..) });
     Cow::Owned(unescaped)
 }
 
