@@ -44,3 +44,5 @@ These are the most efficient and idiomatic uses of `faster-pest`. They work rath
 - Code is so small it is likely to get inlined often by the compiler
 - Parsing itself is entirely zero-copy
 - Iteration over parsed identifiers is almost free
+
+Licence: GPL-3.0
