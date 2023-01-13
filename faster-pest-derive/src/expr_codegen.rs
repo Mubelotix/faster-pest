@@ -33,7 +33,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
         false => "",
     };
     let (cancel1, cancel2, idents) = match contains_idents(expr, has_whitespace) {
-        true => ("let idents_len = idents.len();", "idents.truncate(idents_len);", "idents"),
+        true => ("let idents_len = idents.len();", "unsafe { idents.set_len(idents_len); }", "idents"),
         false => ("", "", ""),
     };
     let hr_expr = to_pest(expr);
