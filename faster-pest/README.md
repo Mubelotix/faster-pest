@@ -10,7 +10,7 @@ The parsing approach used under the hood has nothing in common with the original
 
 ## Benchmarks
 
-Only a week after its creation, `faster-pest` already parses Json at **819%** the speed of Pest and **183%** the speed of Nom. This places `faster-pest` on par with `serde_json`. `faster-pest` allows you to approach limits that only SIMD-powered parsers can overcome.
+Only a week after its creation, `faster-pest` already parses Json at **705%** the speed of Pest and **137%** the speed of Nom. This places `faster-pest` on par with `serde_json`. `faster-pest` allows you to approach limits that only SIMD-powered parsers can overcome.
 
 [Benchmark yourself](https://github.com/Mubelotix/pestvsnom)
 
