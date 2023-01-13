@@ -3,7 +3,8 @@ name = "faster-pest-derive"
 authors = ["Mubelotix <mubelotix@gmail>"]
 description = "proc-macro for faster-pest"
 license = "GPL-3.0-or-later"
-version = "0.1.0"
+repository = "https://github.com/Mubelotix/faster-pest"
+version = "0.1.1"
 edition = "2021"
 
 [lib]
