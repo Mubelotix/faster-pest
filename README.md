@@ -21,7 +21,7 @@ See the [example folder](https://github.com/Mubelotix/faster-pest/tree/master/fa
 It contains two examples from the Pest book: [csv](https://github.com/Mubelotix/faster-pest/tree/master/faster-pest/examples/csv) and [ini](https://github.com/Mubelotix/faster-pest/tree/master/faster-pest/examples/ini).  
 These use the exact same code as in the Pest book, showing that `faster-pest` is a drop-in replacement for Pest.
 
-If you don't have any legacy Pest codebases, it is recommended to not use the pest compatibility layer. See other two examples: [json](https://github.com/Mubelotix/faster-pest/tree/master/faster-pest/examples/json) and [po](https://github.com/Mubelotix/faster-pest/tree/master/faster-pest/examples/po).  
+If you don't have any legacy Pest codebase, it is recommended to not use the pest compatibility layer. See other two examples: [json](https://github.com/Mubelotix/faster-pest/tree/master/faster-pest/examples/json) and [po](https://github.com/Mubelotix/faster-pest/tree/master/faster-pest/examples/po).  
 These are the most efficient and idiomatic uses of `faster-pest`. They work rather similarly to the pest compatibility layer, but their implementation is nicer.
 
 ## Limitations
