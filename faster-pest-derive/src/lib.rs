@@ -104,13 +104,18 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     for rule in &rules {
         let name = rule.name.as_str();
         if !silent_rules.contains(&name) {
-            full_code.push_str(&format!("            Rule::{name} => parse_{name}(input, &mut idents)?,\n"));
+            full_code.push_str(&format!("            Rule::{name} => {struct_ident}_faster_pest::parse_{name}(input, &mut idents)?,\n"));
         }
     }
     full_code.push_str("        };\n");
     full_code.push_str("        Ok(unsafe {{ Pairs2::from_idents(idents, input) }})\n");
     full_code.push_str("    }\n");
     full_code.push_str("}\n\n");
+
+    full_code.push_str("\n\n#[automatically_derived]\n");
+    full_code.push_str("#[allow(clippy::all)]\n");
+    full_code.push_str(&format!("pub mod {struct_ident}_faster_pest {{\n"));
+    full_code.push_str("    use super::*;\n");
 
     let mut ids = IdRegistry::new();
     let mut optimized_exprs = Vec::new();
@@ -134,13 +139,13 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             false => full_code.push_str(&format!(r#"
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
+                pub fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
                     let idents_len = idents.len();
                     if idents_len == idents.capacity() {{
                         idents.reserve(500);
                     }}
                     unsafe {{ idents.set_len(idents_len + 1); }}
-                    let new_input = match {struct_ident}_faster_pest::parse_{top_expr_id}(input, {formatted_idents}) {{
+                    let new_input = match parse_{top_expr_id}(input, {formatted_idents}) {{
                         Ok(input) => input,
                         Err(e) => {{
                             unsafe {{ idents.set_len(idents_len); }}
@@ -154,13 +159,13 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
 
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
+                pub fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
                     let idents_len = idents.len();
                     if idents_len == idents.capacity() {{
                         idents.reserve(500);
                     }}
                     unsafe {{ idents.set_len(idents_len + 1); }}
-                    let new_input = match {struct_ident}_faster_pest::quick_parse_{top_expr_id}(input, {formatted_idents}) {{
+                    let new_input = match quick_parse_{top_expr_id}(input, {formatted_idents}) {{
                         Some(input) => input,
                         None => {{
                             unsafe {{ idents.set_len(idents_len); }}
@@ -176,14 +181,14 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             true => full_code.push_str(&format!(r#"
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
-                    {struct_ident}_faster_pest::parse_{top_expr_id}(input, {formatted_idents})
+                pub fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
+                    parse_{top_expr_id}(input, {formatted_idents})
                 }}
 
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
-                    {struct_ident}_faster_pest::quick_parse_{top_expr_id}(input, {formatted_idents})
+                pub fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
+                    quick_parse_{top_expr_id}(input, {formatted_idents})
                 }}
                 "#)
             ),
@@ -203,11 +208,6 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     }
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();
-    
-    full_code.push_str("#[automatically_derived]\n");
-    full_code.push_str("#[allow(clippy::all)]\n");
-    full_code.push_str(&format!("mod {struct_ident}_faster_pest {{\n"));
-    full_code.push_str("    use super::*;\n");
     for expr in exprs {
         let mut new_code = code(expr, &mut ids, has_whitespace);
         let mut new_code2 = new_code.trim_start_matches('\n');
