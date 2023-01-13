@@ -229,11 +229,11 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                     return format!(r#"
                     // {hr_expr}
                     fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(0);
+                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
                         Ok(unsafe {{ input.get_unchecked(i..) }})
                     }}
                     fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(0);
+                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
                         Some(unsafe {{ input.get_unchecked(i..) }})
                     }}
                         
@@ -242,14 +242,14 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                     return format!(r#"
                     // {hr_expr}
                     fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).ok_or_else(|| Error::new(ErrorKind::Expected("{condition}"), input, "{id} ({condition})+"))?;
+                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
                         if i == 0 {{
                             return Err(Error::new(ErrorKind::Expected("{condition}"), input, "{id} ({condition})+"));
                         }}
                         Ok(unsafe {{ input.get_unchecked(i..) }})
                     }}
                     fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition}))?;
+                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
                         if i == 0 {{
                             return None;
                         }}

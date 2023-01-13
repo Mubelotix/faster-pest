@@ -1,6 +1,6 @@
 #![feature(test)]
 
-use std::{borrow::Cow, collections::{HashMap, BTreeMap}};
+use std::{borrow::Cow, collections::BTreeMap};
 
 extern crate test;
 
