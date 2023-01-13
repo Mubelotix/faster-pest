@@ -2,9 +2,9 @@
 
 Welcome to `faster-pest`, a **high-performance** code generator for [Parsing Expression Grammars](https://pest.rs/book/grammars/peg.html). `faster-pest` is an unofficial pro-macro providing next-level implementations of [Pest](https://pest.rs/) parsers. It uses low-level optimization tricks under the hood to generate highly optimized code which minimizes the overhead of the AST recognition process, resulting in much faster parsing.
 
-`faster-pest` is **compatible** with the standard [Pest syntax](https://pest.rs/book/grammars/syntax.html), so you can easily switch to it without having to change your existing grammar. It also provides detailed performance metrics and debugging information, so you can easily identify and optimize bottlenecks in your parsers.
+`faster-pest` is **compatible** with the standard [Pest syntax](https://pest.rs/book/grammars/syntax.html), so you can easily switch to it without having to change your existing grammar.
 
-With `faster-pest`, you can enjoy the **convenience and expressiveness** of Pest while getting the performance of a low-level parsing library. It's the perfect choice for large-scale or performance-critical parsing projects. Give it a try and experience the difference for yourself!
+With `faster-pest`, you can enjoy the **convenience and expressiveness** of Pest while getting the performance of a low-level parsing library. Give it a try and experience the difference for yourself!
 
 The parsing approach used under the hood has nothing in common with the original pest code. To be honest, I never looked at the pest codebase, because it was easier to start from scratch. There is still one thing that was not reimplemented: the parsing of the actual pest grammar. However, this might not last. I need to extend the grammar to enable more advanced tricks, like making it possible to define complex rules with Rust code and import them in a pest grammar.
 
