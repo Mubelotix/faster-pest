@@ -106,7 +106,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     for rule in &rules {
         let name = rule.name.as_str();
         if !silent_rules.contains(&name) {
-            full_code.push_str(&format!("            Rule::{name} => {struct_ident}_faster_pest::parse_{name}(input, &mut idents)?,\n"));
+            full_code.push_str(&format!("            Rule::{name} => {struct_ident}_faster_pest::parse_{name}(input.as_bytes(), &mut idents)?,\n"));
         }
     }
     full_code.push_str("        };\n");
@@ -145,7 +145,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             false => full_code.push_str(&format!(r#"
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                pub fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
+                pub fn parse_{rule_name}<'i, 'b>(input: &'i [u8], idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i [u8], Error> {{
                     let idents_len = idents.len();
                     if idents_len == idents.capacity() {{
                         idents.reserve(500);
@@ -158,14 +158,14 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                             return Err(e);
                         }}
                     }};
-                    let content = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
+                    let content = unsafe {{ std::str::from_utf8_unchecked(input.get_unchecked(..input.len() - new_input.len())) }};
                     unsafe {{ *idents.get_unchecked_mut(idents_len) = (Ident::{rule_name_pascal_case}(content), idents.len()); }}
                     Ok(new_input)
                 }}
 
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                pub fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
+                pub fn quick_parse_{rule_name}<'i, 'b>(input: &'i [u8], idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i [u8]> {{
                     let idents_len = idents.len();
                     if idents_len == idents.capacity() {{
                         idents.reserve(500);
@@ -178,7 +178,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
                             return None;
                         }}
                     }};
-                    let content = unsafe {{ input.get_unchecked(..input.len() - new_input.len()) }};
+                    let content = unsafe {{ std::str::from_utf8_unchecked(input.get_unchecked(..input.len() - new_input.len())) }};
                     unsafe {{ *idents.get_unchecked_mut(idents_len) = (Ident::{rule_name_pascal_case}(content), idents.len()); }}
                     Some(new_input)
                 }}
@@ -187,13 +187,13 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             true => full_code.push_str(&format!(r#"
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                pub fn parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i str, Error> {{
+                pub fn parse_{rule_name}<'i, 'b>(input: &'i [u8], idents: &'b mut Vec<(Ident<'i>, usize)>) -> Result<&'i [u8], Error> {{
                     parse_{top_expr_id}(input, {formatted_idents})
                 }}
 
                 #[automatically_derived]
                 #[allow(clippy::all)]
-                pub fn quick_parse_{rule_name}<'i, 'b>(input: &'i str, idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i str> {{
+                pub fn quick_parse_{rule_name}<'i, 'b>(input: &'i [u8], idents: &'b mut Vec<(Ident<'i>, usize)>) -> Option<&'i [u8]> {{
                     quick_parse_{top_expr_id}(input, {formatted_idents})
                 }}
                 "#)
@@ -206,7 +206,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             impl {struct_ident} {{
                 pub fn parse_{rule_name}(input: &str) -> Result<IdentList<Ident>, Error> {{
                     let mut idents = Vec::with_capacity(500);
-                    parse_{rule_name}(input, &mut idents)?;
+                    parse_{rule_name}(input.as_bytes(), &mut idents)?;
                     Ok(unsafe {{ IdentList::from_idents(idents) }})
                 }}
             }}"#

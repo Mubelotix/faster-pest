@@ -45,14 +45,14 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
             match ident.as_str() {
                 "EOI" => {
                     format!(r#"
-                    pub fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
+                    pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
                         if input.is_empty() {{
                             Ok(input)
                         }} else {{
-                            Err(Error::new(ErrorKind::Expected("EOI"), input, "EOI"))
+                            Err(Error::new(ErrorKind::Expected("EOI"), unsafe{{std::str::from_utf8_unchecked(input)}}, "EOI"))
                         }}
                     }}
-                    pub fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                    pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
                         if input.is_empty() {{
                             Some(input)
                         }} else {{
@@ -64,10 +64,10 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
                 }
                 "SOI" => {
                     format!(r#" // TODO
-                    pub fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
+                    pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
                         Ok(input)
                     }}
-                    pub fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
+                    pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
                         Some(input)
                     }}
 
@@ -75,19 +75,19 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
                 }
                 "NEWLINE" => {
                     format!(r#"
-                    pub fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                        if input.starts_with("\r\n") {{
+                    pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
+                        if input.starts_with(b"\r\n") {{
                             Ok(unsafe {{ input.get_unchecked(2..) }})
-                        }} else if input.starts_with("\n") || input.starts_with("\r") {{
+                        }} else if input.starts_with(b"\n") || input.starts_with(b"\r") {{
                             Ok(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
-                            Err(Error::new(ErrorKind::Expected("newline"), input, "NEWLINE"))
+                            Err(Error::new(ErrorKind::Expected("newline"), unsafe{{std::str::from_utf8_unchecked(input)}}, "NEWLINE"))
                         }}
                     }}
-                    pub fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                        if input.starts_with("\r\n") {{
+                    pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
+                        if input.starts_with(b"\r\n") {{
                             Some(unsafe {{ input.get_unchecked(2..) }})
-                        }} else if input.starts_with("\n") || input.starts_with("\r") {{
+                        }} else if input.starts_with(b"\n") || input.starts_with(b"\r") {{
                             Some(unsafe {{ input.get_unchecked(1..) }})
                         }} else {{
                             None
@@ -102,23 +102,21 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
         FPestExpr::CharacterCondition(condition) => {
             format!(r#"
             // {condition}
-            pub fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                let b = input.as_bytes();
-                if !b.is_empty() {{
-                    let c = unsafe {{ b.get_unchecked(0) }};
+            pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
+                if !input.is_empty() {{
+                    let c = unsafe {{ input.get_unchecked(0) }};
                     if {condition} {{
                         Ok(unsafe {{ input.get_unchecked(1..) }})
                     }} else {{
-                        Err(Error::new(ErrorKind::Expected("unknown"), input, "{id} {hr_expre}")) // TODO: remove unknown
+                        Err(Error::new(ErrorKind::Expected("unknown"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}")) // TODO: remove unknown
                     }}
                 }} else {{
-                    Err(Error::new(ErrorKind::Expected("unknown"), input, "{id} {hr_expre}"))
+                    Err(Error::new(ErrorKind::Expected("unknown"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
                 }}
             }}
-            pub fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                let b = input.as_bytes();
-                if !b.is_empty() {{
-                    let c = unsafe {{ b.get_unchecked(0) }};
+            pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
+                if !input.is_empty() {{
+                    let c = unsafe {{ input.get_unchecked(0) }};
                     if {condition} {{
                         Some(unsafe {{ input.get_unchecked(1..) }})
                     }} else {{
@@ -148,13 +146,13 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
 
             format!(r#"
             // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+            pub fn parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
             {code}
             {error_code}
                 {cancel2}
-                Err(Error::new(ErrorKind::All(errors), input, "{id} {hr_expre}"))
+                Err(Error::new(ErrorKind::All(errors), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
             }}
-            pub fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+            pub fn quick_parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
             {quick_code}
                 {cancel2}
                 None
@@ -165,15 +163,15 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
         FPestExpr::Str(value) => {
             format!(r#"
             // {hr_expr}
-            pub fn parse_{id}<'i>(input: &'i str) -> Result<&'i str, Error> {{
-                if input.starts_with({value:?}) {{
+            pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
+                if input.starts_with(b{value:?}) {{
                     Ok(unsafe {{ input.get_unchecked({value:?}.len()..) }})
                 }} else {{
-                    Err(Error::new(ErrorKind::ExpectedValue({value:?}), input, "{id} {hr_expre}"))
+                    Err(Error::new(ErrorKind::ExpectedValue({value:?}), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
                 }}
             }}
-            pub fn quick_parse_{id}<'i>(input: &'i str) -> Option<&'i str> {{
-                if input.starts_with({value:?}) {{
+            pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
+                if input.starts_with(b{value:?}) {{
                     Some(unsafe {{ input.get_unchecked({value:?}.len()..) }})
                 }} else {{
                     None
@@ -214,11 +212,11 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
 
             format!(r#"
             // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+            pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
             {code}
                 Ok(input)
             }}
-            pub fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+            pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
             {quick_code}
                 Some(input)
             }}
@@ -236,12 +234,12 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
                 if *empty_accepted {
                     return format!(r#"
                     // {hr_expr}
-                    pub fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
+                    pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
+                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
                         Ok(unsafe {{ input.get_unchecked(i..) }})
                     }}
-                    pub fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
+                    pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
+                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
                         Some(unsafe {{ input.get_unchecked(i..) }})
                     }}
                         
@@ -249,15 +247,15 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
                 } else {
                     return format!(r#"
                     // {hr_expr}
-                    pub fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
+                    pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
+                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
                         if i == 0 {{
-                            return Err(Error::new(ErrorKind::Expected("{condition}"), input, "{id} ({condition})+"));
+                            return Err(Error::new(ErrorKind::Expected("{condition}"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} ({condition})+"));
                         }}
                         Ok(unsafe {{ input.get_unchecked(i..) }})
                     }}
-                    pub fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
-                        let i = input.as_bytes().iter().position(|c| !({condition})).unwrap_or(input.len());
+                    pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
+                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
                         if i == 0 {{
                             return None;
                         }}
@@ -286,7 +284,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
 
             format!(r#"
             // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+            pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
                 {non_empty}
                 while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
                     input = new_input;
@@ -294,7 +292,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
                 }}
                 Ok(input)
             }}
-            pub fn quick_parse_{id}<'i, 'b>(mut input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+            pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
                 {quick_non_empty}
                 while let Some(new_input) = quick_parse_{expr_id}(input, {idents}) {{
                     input = new_input;
@@ -310,7 +308,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
 
             format!(r#"
             // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+            pub fn parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
                 {cancel1}
                 if let Ok(input) = parse_{expr_id}(input, {idents}) {{
                     Ok(input)
@@ -319,7 +317,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
                     Ok(input)
                 }}
             }}
-            pub fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+            pub fn quick_parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
                 {cancel1}
                 if let Some(input) = quick_parse_{expr_id}(input, {idents}) {{
                     Some(input)
@@ -335,16 +333,16 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
 
             format!(r#"
             // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Result<&'i str, Error> {{
+            pub fn parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
                 {cancel1}
                 if parse_{expr_id}(input, {idents}).is_err() {{
                     {cancel2}
                     Ok(input)
                 }} else {{
-                    Err(Error::new(ErrorKind::NegPredFailed("{expr_id}"), input, "{id} {hr_expre}"))
+                    Err(Error::new(ErrorKind::NegPredFailed("{expr_id}"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
                 }}
             }}
-            pub fn quick_parse_{id}<'i, 'b>(input: &'i str, {formatted_idents}) -> Option<&'i str> {{
+            pub fn quick_parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
                 {cancel1}
                 if quick_parse_{expr_id}(input, {idents}).is_none() {{
                     {cancel2} // TODO: remove this
