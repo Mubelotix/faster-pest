@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub(crate) use pest_meta::{optimizer::OptimizedExpr, ast::RuleType};
 extern crate proc_macro;
 use proc_macro::TokenStream;
@@ -120,8 +122,12 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     let mut ids = IdRegistry::new();
     let mut optimized_exprs = Vec::new();
     let mut exprs = Vec::new();
+    let mut character_set_rules = HashMap::new();
     for rule in &rules {
         let expr = optimize(&rule.expr);
+        if let FPestExpr::CharacterCondition(c) = &expr {
+            character_set_rules.insert(rule.name.as_str(), c.to_owned());
+        }
         optimized_exprs.push(expr);
     }
     println!("{:#?}", optimized_exprs);
@@ -209,7 +215,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();
     for expr in exprs {
-        let mut new_code = code(expr, &mut ids, has_whitespace);
+        let mut new_code = code(expr, &mut ids, has_whitespace, &character_set_rules);
         let mut new_code2 = new_code.trim_start_matches('\n');
         let new_code2_len = new_code2.len();
         new_code2 = new_code2.trim_start_matches(' ');
