@@ -28,7 +28,7 @@ These are the most efficient and idiomatic uses of `faster-pest`. They work rath
 
 `faster-pest` is still in its early stages of development, so it has some limitations. Here are the most important ones:
 
-- Limited syntax support (Missing: stack, insens, range, pospred)
+- Limited syntax support (Missing: stack, insens, pospred)
 - The tokens API of Pest is not supported (you probably didn't use that)
 - Error printing is made for Linux
 - Errors can be obscure when a repetition ends prematurely
