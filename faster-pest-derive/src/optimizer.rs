@@ -125,3 +125,77 @@ pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
         OptimizedExpr::PeekSlice(_, _) => todo!(),
     }
 }
+
+pub fn optimize_second_stage(expr: &mut FPestExpr, character_set_rules: &HashMap<&str, String>) {
+    match expr {
+        FPestExpr::Ident(ident) => if let Some(condition) = character_set_rules.get(ident.as_str()) {
+            *expr = FPestExpr::CharacterCondition(condition.to_string());
+        },
+        FPestExpr::Str(_) => (),
+        FPestExpr::Insens(_) => (),
+        FPestExpr::CharacterCondition(_) => (),
+        FPestExpr::NegPred(expr) => optimize_second_stage(expr, character_set_rules),
+        FPestExpr::Seq(items) => {
+            for item in items.iter_mut() {
+                optimize_second_stage(item, character_set_rules);
+            }
+
+            // Find NegPred(character condition) that are before a character condition
+            // and merge them into the character condition
+            let mut i = 0;
+            while i + 1 < items.len() {
+                if let FPestExpr::NegPred(boxed) = &items[i] {
+                    if let FPestExpr::CharacterCondition(c) = &**boxed {
+                        if let FPestExpr::CharacterCondition(c2) = &items[i + 1] {
+                            items[i] = FPestExpr::CharacterCondition(format!("(!{} && {})", c, c2));
+                            items.remove(i + 1);
+                            continue;
+                        } else if let FPestExpr::NegPred(boxed2) = &items[i + 1] {
+                            if let FPestExpr::CharacterCondition(c2) = &**boxed2 {
+                                items[i] = FPestExpr::NegPred(Box::new(FPestExpr::CharacterCondition(format!("({} || {})", c, c2))));
+                                items.remove(i + 1);
+                                continue;
+                            }
+                        }
+                    }
+                }
+                i += 1;
+            }
+
+            if items.len() == 1 {
+                *expr = items.pop().unwrap();
+            }
+        },
+        FPestExpr::Choice(items) => {
+            // Group character conditions that are next to each other
+            let mut fp_choices = Vec::new();
+            let mut current_condition = String::new();
+            for item in items.iter_mut() {
+                optimize_second_stage(item, character_set_rules);
+                if let FPestExpr::CharacterCondition(c) = item {
+                    if !current_condition.is_empty() {
+                        current_condition.push_str(" || ");
+                    }
+                    current_condition.push_str(c);
+                } else {
+                    if !current_condition.is_empty() {
+                        fp_choices.push(FPestExpr::CharacterCondition(current_condition));
+                        current_condition = String::new();
+                    }
+                    fp_choices.push(item.to_owned());
+                }
+            }
+            if !current_condition.is_empty() {
+                fp_choices.push(FPestExpr::CharacterCondition(current_condition));
+            }
+
+            if fp_choices.len() == 1 {
+                *expr = fp_choices.pop().unwrap()
+            } else {
+                *expr = FPestExpr::Choice(fp_choices);
+            }
+        },
+        FPestExpr::Rep(expr, _) => optimize_second_stage(expr, character_set_rules),
+        FPestExpr::Opt(expr) => optimize_second_stage(expr, character_set_rules),
+    }
+}

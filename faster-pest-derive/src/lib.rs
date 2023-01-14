@@ -130,6 +130,9 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
         }
         optimized_exprs.push(expr);
     }
+    for expr in &mut optimized_exprs {
+        optimize_second_stage(expr, &character_set_rules);
+    }
     println!("{:#?}", optimized_exprs);
     for (i, rule) in rules.iter().enumerate() {
         let expr = optimized_exprs.get(i).unwrap();
@@ -215,7 +218,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     exprs.sort_by_key(|expr| ids.id(expr));
     exprs.dedup();
     for expr in exprs {
-        let mut new_code = code(expr, &mut ids, has_whitespace, &character_set_rules);
+        let mut new_code = code(expr, &mut ids, has_whitespace);
         let mut new_code2 = new_code.trim_start_matches('\n');
         let new_code2_len = new_code2.len();
         new_code2 = new_code2.trim_start_matches(' ');

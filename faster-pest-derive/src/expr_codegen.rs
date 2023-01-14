@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use crate::{*, optimizer::FPestExpr};
 
 pub const CONDITIONS: &[(&str, &str)] = &[
@@ -28,7 +26,7 @@ fn to_pest(expr: &FPestExpr) -> String {
     }
 }
 
-pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, character_set_rules: &HashMap<&str, String>) -> String {
+pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
     let formatted_idents = match contains_idents(expr, has_whitespace) {
         true => "idents: &'b mut Vec<(Ident<'i>, usize)>",
@@ -224,13 +222,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool, charac
             "#)
         }
         FPestExpr::Rep(expr, empty_accepted) => {
-            let mut condition = if let FPestExpr::CharacterCondition(condition) = &**expr { Some(condition) } else { None };
-            if let FPestExpr::Ident(a) = &**expr {
-                if let Some(c) = character_set_rules.get(a.as_str()) {
-                    condition = Some(c);
-                }
-            }
-            if let Some(condition) = condition {
+            if let FPestExpr::CharacterCondition(condition) = &**expr {
                 if *empty_accepted {
                     return format!(r#"
                     // {hr_expr}
