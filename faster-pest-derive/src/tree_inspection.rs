@@ -25,7 +25,7 @@ pub fn contains_idents(expr: &FPestExpr, has_whitespace: bool) -> bool {
     }
 }
 
-pub fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a OptimizedExpr>) {
+pub fn list_choices<'a>(expr: &'a OptimizedExpr, choices: &mut Vec<&'a OptimizedExpr>) {
     if let OptimizedExpr::Choice(first, second) = expr {
         list_choices(first, choices);
         list_choices(second, choices);
@@ -34,7 +34,7 @@ pub fn list_choices<'a, 'b>(expr: &'a OptimizedExpr, choices: &'b mut Vec<&'a Op
     }
 }
 
-pub fn list_seq<'a, 'b>(expr: &'a OptimizedExpr, seq: &'b mut Vec<&'a OptimizedExpr>) {
+pub fn list_seq<'a>(expr: &'a OptimizedExpr, seq: &mut Vec<&'a OptimizedExpr>) {
     if let OptimizedExpr::Seq(first, second) = expr {
         list_seq(first, seq);
         list_seq(second, seq);
