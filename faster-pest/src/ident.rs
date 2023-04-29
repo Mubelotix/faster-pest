@@ -108,10 +108,16 @@ impl<'i, I: IdentTrait> AsRef<I> for IdentRef<'i, I> {
 
 impl<'i, I: IdentTrait> std::fmt::Debug for IdentRef<'i, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(&format!("{:?}", self.as_rule()))
-            .field("text", &self.as_str())
-            .field("children", &self.children())
-            .finish()
+        if self.range.len() > 1 {
+            f.debug_struct(&format!("{:?}", self.as_rule()))
+                .field("text", &self.as_str())
+                .field("children", &self.children())
+                .finish()
+        } else {
+            f.debug_struct(&format!("{:?}", self.as_rule()))
+                .field("text", &self.as_str())
+                .finish()
+        }
     }
 }
 
