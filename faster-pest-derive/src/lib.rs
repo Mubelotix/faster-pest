@@ -125,8 +125,10 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     let mut character_set_rules = HashMap::new();
     for rule in &rules {
         let expr = optimize(&rule.expr);
-        if let FPestExpr::CharacterCondition(c) = &expr {
-            character_set_rules.insert(rule.name.as_str(), c.to_owned());
+        if matches!(rule.ty, RuleType::Silent) {
+            if let FPestExpr::CharacterCondition(c) = &expr {
+                character_set_rules.insert(rule.name.as_str(), c.to_owned());
+            }
         }
         optimized_exprs.push(expr);
     }
