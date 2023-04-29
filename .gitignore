@@ -2,3 +2,4 @@
 /Cargo.lock
 tests/test2.rs
 .vscode
+fp_code.rs

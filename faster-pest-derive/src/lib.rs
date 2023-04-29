@@ -209,6 +209,10 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
             impl {struct_ident} {{
                 pub fn parse_{rule_name}(input: &str) -> Result<IdentList<Ident>, Error> {{
                     let mut idents = Vec::with_capacity(500);
+                    if quick_parse_{rule_name}(input.as_bytes(), &mut idents).is_some() {{
+                        return Ok(unsafe {{ IdentList::from_idents(idents) }});
+                    }}
+                    idents.clear();
                     parse_{rule_name}(input.as_bytes(), &mut idents)?;
                     Ok(unsafe {{ IdentList::from_idents(idents) }})
                 }}
@@ -228,7 +232,7 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
         full_code.push_str(new_code.as_str());
     }
     full_code.push_str("}\n");
-    println!("{full_code}");
+    std::fs::write("target/fp_code.rs", &full_code).unwrap();
 
     full_code.parse().unwrap()
 }
