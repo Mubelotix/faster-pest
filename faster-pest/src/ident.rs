@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 
 pub trait IdentTrait: Copy {
     type Rule: pest::RuleType;
@@ -22,6 +23,23 @@ impl<I: IdentTrait> IdentList<I> {
     pub unsafe fn from_idents(idents: Vec<(I, usize)>) -> Self {
         Self {
             all_idents: idents
+        }
+    }
+
+    /// # Safety
+    /// 
+    /// The caller must ensure that `idx` is a valid index.
+    pub unsafe fn get_unchecked(&self, idx: usize) -> IdentRef<'_, I> {
+        IdentRef {
+            ident_list: self,
+            range: idx..self.all_idents.get_unchecked(idx).1,
+        }
+    }
+
+    pub fn root(&self) -> IdentRef<I> {
+        IdentRef {
+            ident_list: self,
+            range: 0..self.all_idents.len(),
         }
     }
 }
@@ -63,6 +81,10 @@ impl<'i, I: IdentTrait> IdentRef<'i, I> {
         }
     }
 
+    pub fn idx(&self) -> usize {
+        self.range.start
+    }
+
     pub fn as_str(&self) -> &'i str {
         self.ident().as_str()
     }
@@ -95,13 +117,13 @@ impl<'i, I: IdentTrait> IdentRef<'i, I> {
 }
 
 impl<'i, I: IdentTrait> AsRef<str> for IdentRef<'i, I> {
-    fn as_ref(&self) -> &str {
+    fn as_ref(&self) -> &'i str {
         self.ident().as_str()
     }
 }
 
 impl<'i, I: IdentTrait> AsRef<I> for IdentRef<'i, I> {
-    fn as_ref(&self) -> &I {
+    fn as_ref(&self) -> &'i I {
         self.ident()
     }
 }
