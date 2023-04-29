@@ -1,10 +1,10 @@
 [package]
 name = "faster-pest-derive"
-authors = ["Mubelotix <mubelotix@gmail>"]
+authors = ["Mubelotix <mubelotix@gmail.com>"]
 description = "proc-macro for faster-pest"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/Mubelotix/faster-pest"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [lib]
