@@ -345,6 +345,43 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             }}
             "#)
         }
+        FPestExpr::Insens(value) => {
+            let inverted_value = value.chars().map(|c| {
+                if c.is_ascii_uppercase() {
+                    c.to_ascii_lowercase()
+                } else {
+                    c.to_ascii_uppercase()
+                }
+            }).collect::<String>();
+            let len = value.len();
+
+            format!(r#"
+            // {hr_expr}
+            pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
+                if input.len() < {len} {{
+                    return Err(Error::new(ErrorKind::ExpectedValue({value:?}), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"));
+                }}
+                for i in 0..{len} {{
+                    if input[i] != b{value:?}[i] && input[i] != b{inverted_value:?}[i] {{
+                        return Err(Error::new(ErrorKind::ExpectedValue({value:?}), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"));
+                    }}
+                }}
+                Ok(unsafe {{ input.get_unchecked({len}..) }})
+            }}
+            pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
+                if input.len() < {len} {{
+                    return None;
+                }}
+                for i in 0..{len} {{
+                    if input[i] != b{value:?}[i] && input[i] != b{inverted_value:?}[i] {{
+                        return None;
+                    }}
+                }}
+                Some(unsafe {{ input.get_unchecked({len}..) }})
+            }}
+
+            "#)
+        }
         expr => todo!("code on {:?}", expr),
     }
 }
