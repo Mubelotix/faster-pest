@@ -270,7 +270,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             };
 
             let (non_empty, quick_non_empty) = match empty_accepted {
-                false => (format!("parse_{expr_id}(input, {idents})?;"), format!("quick_parse_{expr_id}(input, {idents})?;")),
+                false => (format!("input = parse_{expr_id}(input, {idents})?;"), format!("input = quick_parse_{expr_id}(input, {idents})?;")),
                 true => (String::new(), String::new()),
             };
 
