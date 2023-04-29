@@ -129,6 +129,45 @@ pub struct IdentIter<'i, I: IdentTrait> {
     i: usize,
 }
 
+impl<'i, I: IdentTrait> IdentIter<'i, I> {
+    pub fn join_all(&self) -> Cow<'i, str> {
+        // Try joining a reference first
+        'try_ref: {
+            if self.range.is_empty() {
+                return Cow::Borrowed("");
+            }
+            let first_str = unsafe { self.ident_list.get_unchecked(self.range.start).as_str() };
+            let mut end = unsafe { first_str.as_ptr().add(first_str.len()) };
+            let others = IdentIter {
+                ident_list: self.ident_list,
+                range: self.range.clone(),
+                i: 1,
+            };
+            for next in others {
+                let next_str = next.as_str();
+                if end == next_str.as_ptr() {
+                    end = unsafe { next_str.as_ptr().add(next_str.len()) };
+                } else {
+                    break 'try_ref
+                }
+            }
+            return Cow::Borrowed(unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(first_str.as_ptr(), end as usize - first_str.as_ptr() as usize)) });
+        }
+
+        // Fallback to a string
+        let mut result = String::new();
+        let all = IdentIter {
+            ident_list: self.ident_list,
+            range: self.range.clone(),
+            i: 0,
+        };
+        for next in all {
+            result.push_str(next.as_str());
+        }
+        result.into()
+    }
+}
+
 impl<'i, I: IdentTrait> Iterator for IdentIter<'i, I> {
     type Item = IdentRef<'i, I>;
 
