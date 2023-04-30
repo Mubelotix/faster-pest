@@ -382,6 +382,5 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
 
             "#)
         }
-        expr => todo!("code on {:?}", expr),
     }
 }

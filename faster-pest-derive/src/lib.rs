@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use pest_meta::optimizer::OptimizedRule;
 pub(crate) use pest_meta::{optimizer::OptimizedExpr, ast::RuleType};
 extern crate proc_macro;
 use proc_macro::TokenStream;
@@ -16,29 +17,47 @@ pub(crate) use optimizer::*;
 use syn::*;
 use proc_macro2::TokenTree;
 
+fn list_grammar_files(attrs: &[Attribute]) -> Vec<String> {
+    attrs.iter().filter(|attr| attr.path.is_ident("grammar")).map(|a| {
+        let mut tokens = a.tokens.clone().into_iter();
+        match tokens.next() {
+            Some(TokenTree::Punct(punct)) if punct.as_char() == '=' => (),
+            _ => panic!("Expected leading '=' in grammar attribute"),
+        }
+        let path = match tokens.next() {
+            Some(TokenTree::Literal(value)) => value.to_string(),
+            _ => panic!("Expected literal in grammar attribute")
+        };
+        path.trim_matches('"').to_string()
+    }).collect()
+}
+
+fn get_all_rules(grammar_files: &[String]) -> Vec<OptimizedRule> {
+    let mut rules = HashMap::new();
+
+    for path in grammar_files {
+        let Ok(grammar) = std::fs::read_to_string(path) else {
+            panic!("Could not read grammar file at {path:?}");
+        };
+        let (_, new_rules) = match pest_meta::parse_and_optimize(&grammar) {
+            Ok(new_rules) => new_rules,
+            Err(e) => panic!("{}", e[0])
+        };
+        for new_rule in new_rules {
+            rules.insert(new_rule.name.clone(), new_rule);
+        }
+    }
+
+    rules.into_values().collect()
+}
+
 #[proc_macro_derive(Parser, attributes(grammar))]
 pub fn derive_parser(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let struct_ident = ast.ident;
-    let mut grammar_tokens = ast.attrs.iter().find(|attr| attr.path.is_ident("grammar")).unwrap().tokens.clone().into_iter();
-    match grammar_tokens.next() {
-        Some(TokenTree::Punct(punct)) if punct.as_char() == '=' => (),
-        _ => panic!("Expected leading '=' in grammar attribute"),
-    }
-    let grammar_path = match grammar_tokens.next() {
-        Some(TokenTree::Literal(value)) => value.to_string(),
-        _ => panic!("Expected literal in grammar attribute")
-    };
-    let grammar_path = grammar_path.trim_matches('"');
 
-    let Ok(grammar) = std::fs::read_to_string(grammar_path) else {
-        panic!("Could not read grammar file at {grammar_path:?}");
-    };
-    let (_, rules) = match pest_meta::parse_and_optimize(&grammar) {
-        Ok(rules) => rules,
-        Err(e) => panic!("{}", e[0])
-    };
-    println!("{:#?}", rules);
+    let grammar_files = list_grammar_files(&ast.attrs);
+    let rules = get_all_rules(&grammar_files);
     let mut full_code = String::new();
 
     // Find silent rules

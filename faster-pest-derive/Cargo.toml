@@ -13,4 +13,4 @@ proc-macro = true
 [dependencies]
 syn = "1.0"
 proc-macro2 = "1.0"
-pest_meta = "2.5.2"
+pest_meta = "2.6"
