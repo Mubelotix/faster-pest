@@ -4,7 +4,7 @@ authors = ["Mubelotix <mubelotix@gmail.com>"]
 description = "proc-macro for faster-pest"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/Mubelotix/faster-pest"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 
 [lib]
@@ -13,4 +13,4 @@ proc-macro = true
 [dependencies]
 syn = "1.0"
 proc-macro2 = "1.0"
-pest_meta = "2.6"
+pest_meta = "2.7"

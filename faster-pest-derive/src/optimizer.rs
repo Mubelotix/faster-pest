@@ -118,7 +118,6 @@ pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
                 todo!()
             }
         }
-        OptimizedExpr::NodeTag(expr, _) => optimize(expr),
         OptimizedExpr::PosPred(_) => todo!(),
         OptimizedExpr::Skip(_) => todo!(),
         OptimizedExpr::Push(_) => todo!(),
