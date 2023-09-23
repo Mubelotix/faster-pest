@@ -127,36 +127,20 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             "#)
         }
         FPestExpr::Choice(items) => {
-            let mut code = String::new();
-            let mut quick_code = String::new();
-            let mut error_code = String::from("    let mut errors = Vec::new();\n");
-            for (i, item) in items.iter().enumerate() {
-                let bid = ids.id(item);
-                let idents = match contains_idents(item, has_whitespace) {
-                    true => "idents",
-                    false => "",
-                };
-                let cancel = if i == 0 { cancel1 } else { cancel2 } ;
-                code.push_str(&format!("{cancel}    if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Ok(input); }}\n"));
-                quick_code.push_str(&format!("{cancel}    if let Some(input) = quick_parse_{bid}(input, {idents}) {{ return Some(input); }}\n"));
-                error_code.push_str(&format!("    errors.push(parse_{bid}(input, {idents}).unwrap_err());\n"));
-            }
-
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-            {code}
-            {error_code}
-                {cancel2}
-                Err(Error::new(ErrorKind::All(errors), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
-            }}
-            pub fn quick_parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-            {quick_code}
-                {cancel2}
-                None
-            }}
-
-            "#)
+            let mut code = include_str!("pattern_expr_choice.rs").to_owned();
+            code = code.replace("expr_id", &id);
+            code = code.replace("expr_pest", &hr_expr);
+            code = code.replace("formatted_idents", formatted_idents);
+            code = multi_replace(code, vec![
+                ("choice_item_id", items.iter().map(|item| ids.id(item)).collect::<Vec<_>>()),
+                ("choice_idents", items.iter().map(|item| {
+                    match contains_idents(item, has_whitespace) {
+                        true => "idents",
+                        false => "",
+                    }.to_string()
+                }).collect::<Vec<_>>()),
+            ]);
+            code
         }
         FPestExpr::Str(value) => {
             format!(r#"

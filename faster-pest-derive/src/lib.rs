@@ -176,6 +176,5 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
     full_code = full_code.replace("    // inner code", inner_code.as_str());
     std::fs::write("target/fp_code.rs", &full_code).unwrap();
     
-    std::fs::write("target/fp_code2.rs", &full_code).unwrap();
     full_code.parse().unwrap()
 }
