@@ -143,24 +143,11 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::Str(value) => {
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
-                if input.starts_with(b{value:?}) {{
-                    Ok(unsafe {{ input.get_unchecked({value:?}.len()..) }})
-                }} else {{
-                    Err(Error::new(ErrorKind::ExpectedValue({value:?}), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
-                }}
-            }}
-            pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
-                if input.starts_with(b{value:?}) {{
-                    Some(unsafe {{ input.get_unchecked({value:?}.len()..) }})
-                }} else {{
-                    None
-                }}
-            }}
-
-            "#)
+            let mut code = include_str!("pattern_expr_str.rs").to_owned();
+            code = code.replace("expr_id", &id);
+            code = code.replace("expr_pest", &hr_expr);
+            code = code.replace("expr_str", format!("{value:?}").as_str());
+            code
         }
         FPestExpr::Seq(items) => {
             let mut code = String::new();
