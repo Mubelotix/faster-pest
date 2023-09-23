@@ -279,29 +279,16 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::NegPred(expr) => {
-            let expr_id = ids.id(expr);
-
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-                {cancel1}
-                if parse_{expr_id}(input, {idents}).is_err() {{
-                    {cancel2}
-                    Ok(input)
-                }} else {{
-                    Err(Error::new(ErrorKind::NegPredFailed("{expr_id}"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
-                }}
-            }}
-            pub fn quick_parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-                {cancel1}
-                if quick_parse_{expr_id}(input, {idents}).is_none() {{
-                    {cancel2} // TODO: remove this
-                    Some(input)
-                }} else {{
-                    None
-                }}
-            }}
-            "#)
+            let code = include_str!("pattern_expr_neg.rs").to_owned();
+            let code = code.replace("expr_id", &id);
+            let code = code.replace("expr_pest", &hr_expr);
+            let code = code.replace("formatted_idents", formatted_idents);
+            let code = code.replace("inner_id", &ids.id(expr));
+            let code = code.replace("inner_idents", match contains_idents(expr, has_whitespace) {
+                true => "idents",
+                false => "",
+            });
+            code
         }
         FPestExpr::Insens(value) => {
             let inverted_value = value.chars().map(|c| {

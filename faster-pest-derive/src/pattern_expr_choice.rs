@@ -13,7 +13,6 @@ pub fn parse_expr_id<'i, 'b>(input: &'i [u8], formatted_idents) -> Result<&'i [u
 
     Err(Error::new(ErrorKind::All(errors), unsafe{std::str::from_utf8_unchecked(input)}, "expr_id expr_pest"))
 }
-
 pub fn quick_parse_expr_id<'i, 'b>(input: &'i [u8], formatted_idents) -> Option<&'i [u8]> {
     let idents_len = idents.len();
 
