@@ -298,34 +298,14 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                     c.to_ascii_uppercase()
                 }
             }).collect::<String>();
-            let len = value.len();
 
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
-                if input.len() < {len} {{
-                    return Err(Error::new(ErrorKind::ExpectedValue({value:?}), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"));
-                }}
-                for i in 0..{len} {{
-                    if input[i] != b{value:?}[i] && input[i] != b{inverted_value:?}[i] {{
-                        return Err(Error::new(ErrorKind::ExpectedValue({value:?}), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"));
-                    }}
-                }}
-                Ok(unsafe {{ input.get_unchecked({len}..) }})
-            }}
-            pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
-                if input.len() < {len} {{
-                    return None;
-                }}
-                for i in 0..{len} {{
-                    if input[i] != b{value:?}[i] && input[i] != b{inverted_value:?}[i] {{
-                        return None;
-                    }}
-                }}
-                Some(unsafe {{ input.get_unchecked({len}..) }})
-            }}
-
-            "#)
+            let code = include_str!("pattern_expr_insens.rs").to_owned();
+            let code = code.replace("expr_id", &id);
+            let code = code.replace("expr_pest", &hr_expr);
+            let code = code.replace("expr_str", format!("{value:?}").as_str());
+            let code = code.replace("expr_inv_str", format!("{inverted_value:?}").as_str());
+            let code = code.replace("expr_len_str", &value.len().to_string());
+            code
         }
     }
 }
