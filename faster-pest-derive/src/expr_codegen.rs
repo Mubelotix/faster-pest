@@ -267,29 +267,16 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             "#)
         }
         FPestExpr::Opt(expr) => {
-            let expr_id = ids.id(expr);
-
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-                {cancel1}
-                if let Ok(input) = parse_{expr_id}(input, {idents}) {{
-                    Ok(input)
-                }} else {{
-                    {cancel2}
-                    Ok(input)
-                }}
-            }}
-            pub fn quick_parse_{id}<'i, 'b>(input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-                {cancel1}
-                if let Some(input) = quick_parse_{expr_id}(input, {idents}) {{
-                    Some(input)
-                }} else {{
-                    {cancel2}
-                    Some(input)
-                }}
-            }}
-            "#)
+            let code = include_str!("pattern_expr_opt.rs").to_owned();
+            let code = code.replace("expr_id", &id);
+            let code = code.replace("expr_pest", &hr_expr);
+            let code = code.replace("formatted_idents", formatted_idents);
+            let code = code.replace("inner_id", &ids.id(expr));
+            let code = code.replace("inner_idents", match contains_idents(expr, has_whitespace) {
+                true => "idents",
+                false => "",
+            });
+            code
         }
         FPestExpr::NegPred(expr) => {
             let expr_id = ids.id(expr);
