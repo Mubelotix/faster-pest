@@ -18,7 +18,7 @@ pub fn contains_idents(expr: &FPestExpr, has_whitespace: bool) -> bool {
         },
         FPestExpr::NegPred(expr) | FPestExpr::Opt(expr) => contains_idents(expr, has_whitespace),
         FPestExpr::Seq(items) => has_whitespace || items.iter().any(|i| contains_idents(i, has_whitespace)),
-        FPestExpr::Choice(items) => items.iter().any(|i| contains_idents(i, has_whitespace)),
+        FPestExpr::Choice(items) => true, // TODO: items.iter().any(|i| contains_idents(i, has_whitespace)),
         FPestExpr::Rep(expr, _) => has_whitespace || contains_idents(expr, has_whitespace),
         FPestExpr::Str(_) | FPestExpr::Insens(_) | FPestExpr::CharacterCondition(_) => false,
         FPestExpr::Ident(_) => false,

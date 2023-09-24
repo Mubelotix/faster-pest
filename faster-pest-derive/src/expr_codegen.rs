@@ -127,6 +127,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
+            code = code.replace("test_replace", &items.len().to_string());
             code = multi_replace(code, vec![
                 ("choice_item_id", items.iter().map(|item| ids.id(item)).collect::<Vec<_>>()),
                 ("choice_idents", items.iter().map(|item| {
@@ -146,7 +147,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::Seq(items) => {
-            let mut code = include_str!("pattern_expr_choice.rs").to_owned();
+            let mut code = include_str!("pattern_expr_seq.rs").to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
@@ -158,7 +159,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                         false => "",
                     }.to_string()
                 }).collect::<Vec<_>>()),
-                ("seq_i", (0..items.len()).map(|i| i.to_string()).collect::<Vec<_>>()),
+                ("seq_n", (0..items.len()).map(|i| i.to_string()).collect::<Vec<_>>()),
             ]);
             if has_whitespace {
                 code = code.replace("//WSP", " ");

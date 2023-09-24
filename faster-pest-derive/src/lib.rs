@@ -111,8 +111,8 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
 
     let mut full_code = include_str!("pattern_outer.rs").to_string();
     full_code = multi_replace(full_code, vec![
-        ("RuleVariant", rules.iter().map(|rule| rule.name.as_str().to_string()).collect()),
-        ("IdentVariant", rules.iter().map(|rule| {
+        ("RuleVariant", rules.iter().filter(|r| !silent_rules.contains(&r.name.as_str())).map(|rule| rule.name.as_str().to_string()).collect()),
+        ("IdentVariant", rules.iter().filter(|r| !silent_rules.contains(&r.name.as_str())).map(|rule| {
             let name = rule.name.as_str();
             let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
             name_pascal_case

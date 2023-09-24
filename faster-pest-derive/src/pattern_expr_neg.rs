@@ -5,7 +5,7 @@ pub fn parse_expr_id<'i, 'b>(input: &'i [u8], formatted_idents) -> Result<&'i [u
         unsafe { idents.set_len(idents_len); }
         Ok(input)
     } else {
-        Err(Error::new(ErrorKind::NegPredFailed("inner_id"), unsafe{std::str::from_utf8_unchecked(input)}, "expr_id expr_pest"))
+        Err(Error::new(ErrorKind::NegPredFailed("inner_id"), unsafe{std::str::from_utf8_unchecked(input)}, r#"expr_id expr_pest"#))
     }
 }
 pub fn quick_parse_expr_id<'i, 'b>(input: &'i [u8], formatted_idents) -> Option<&'i [u8]> {

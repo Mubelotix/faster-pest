@@ -30,7 +30,7 @@ impl StructIdent {
         let mut idents = Vec::with_capacity(500); // TODO: refine 500
         match rule {
             Rule::RuleVariant => StructIdent_faster_pest::parse_RuleVariant(input.as_bytes(), &mut idents)?,
-        }
+        };
         Ok(unsafe { Pairs2::from_idents(idents, input) })
     }
 }
