@@ -5,7 +5,6 @@ pub fn parse_expr_id<'i, 'b>(input: &'i [u8], formatted_idents) -> Result<&'i [u
     if let Some(input) = quick_parse_choice_item_id(input, choice_idents) { return Ok(input); } unsafe { idents.set_len(idents_len); }
 
     // TODO: remove last set_len
-    // test_replace
 
     let mut errors = Vec::new();
     errors.push(parse_choice_item_id(input, choice_idents).unwrap_err());

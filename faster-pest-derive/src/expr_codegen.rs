@@ -94,40 +94,18 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             }
         }
         FPestExpr::CharacterCondition(condition) => {
-            format!(r#"
-            // {condition}
-            pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
-                if !input.is_empty() {{
-                    let c = unsafe {{ input.get_unchecked(0) }};
-                    if {condition} {{
-                        Ok(unsafe {{ input.get_unchecked(1..) }})
-                    }} else {{
-                        Err(Error::new(ErrorKind::Expected("unknown"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}")) // TODO: remove unknown
-                    }}
-                }} else {{
-                    Err(Error::new(ErrorKind::Expected("unknown"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} {hr_expre}"))
-                }}
-            }}
-            pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
-                if !input.is_empty() {{
-                    let c = unsafe {{ input.get_unchecked(0) }};
-                    if {condition} {{
-                        Some(unsafe {{ input.get_unchecked(1..) }})
-                    }} else {{
-                        None
-                    }}
-                }} else {{
-                    None
-                }}
-            }}
-            "#)
+            let mut code = include_str!("pattern_expr_character.rs").to_owned();
+            code = code.replace("expr_id", &id);
+            code = code.replace("expr_pest", &hr_expr);
+            code = code.replace("formatted_idents", formatted_idents);
+            code = code.replace("character_condition", condition);
+            code
         }
         FPestExpr::Choice(items) => {
             let mut code = include_str!("pattern_expr_choice.rs").to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
-            code = code.replace("test_replace", &items.len().to_string());
             code = multi_replace(code, vec![
                 ("choice_item_id", items.iter().map(|item| ids.id(item)).collect::<Vec<_>>()),
                 ("choice_idents", items.iter().map(|item| {
