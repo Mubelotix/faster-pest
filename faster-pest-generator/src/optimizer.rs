@@ -1,5 +1,5 @@
 use pest_meta::optimizer::OptimizedExpr;
-use crate::{expr_codegen::CONDITIONS, *};
+use crate::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FPestExpr {
@@ -15,11 +15,11 @@ pub enum FPestExpr {
     Opt(Box<FPestExpr>),
 }
 
-pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
+pub fn optimize<G: Generator>(expr: &OptimizedExpr) -> FPestExpr {
     match expr {
         OptimizedExpr::Str(value) => {
             if value.len() == 1 {
-                FPestExpr::CharacterCondition(format!("(c == &{:?})", value.chars().next().unwrap() as u8))
+                FPestExpr::CharacterCondition(G::character(value.as_bytes()[0]))
             } else {
                 FPestExpr::Str(value.to_owned())
             }
@@ -29,23 +29,23 @@ pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
             FPestExpr::Insens(value.to_owned())
         }
         OptimizedExpr::Ident(ident) => {
-            if let Some((_, condition)) = CONDITIONS.iter().find(|(n,_)| n==ident) {
+            if let Some(condition) = G::character_ident(ident) {
                 FPestExpr::CharacterCondition(condition.to_string())
             } else {
                 FPestExpr::Ident(ident.to_owned())
             }
         },
         OptimizedExpr::NegPred(expr) => {
-            FPestExpr::NegPred(Box::new(optimize(expr)))
+            FPestExpr::NegPred(Box::new(optimize::<G>(expr)))
         }
         OptimizedExpr::Seq(first, second) => {
             if **second == OptimizedExpr::Rep(first.to_owned()) {
-                return FPestExpr::Rep(Box::new(optimize(first)), false);
+                return FPestExpr::Rep(Box::new(optimize::<G>(first)), false);
             }
 
             let mut seq = Vec::new();
             list_seq(expr, &mut seq);
-            let mut items = seq.into_iter().map(optimize).collect::<Vec<_>>();
+            let mut items = seq.into_iter().map(optimize::<G>).collect::<Vec<_>>();
 
             // Find NegPred(character condition) that are before a character condition
             // and merge them into the character condition
@@ -83,7 +83,7 @@ pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
             let mut fp_choices = Vec::new();
             let mut current_condition = String::new();
             for choice in choices {
-                let choice = optimize(choice);
+                let choice = optimize::<G>(choice);
                 if let FPestExpr::CharacterCondition(c) = choice {
                     if !current_condition.is_empty() {
                         current_condition.push_str(" || ");
@@ -107,13 +107,13 @@ pub fn optimize(expr: &OptimizedExpr) -> FPestExpr {
                 FPestExpr::Choice(fp_choices)
             }
         },
-        OptimizedExpr::Opt(expr) => FPestExpr::Opt(Box::new(optimize(expr))),
-        OptimizedExpr::Rep(expr) => FPestExpr::Rep(Box::new(optimize(expr)), true),
+        OptimizedExpr::Opt(expr) => FPestExpr::Opt(Box::new(optimize::<G>(expr))),
+        OptimizedExpr::Rep(expr) => FPestExpr::Rep(Box::new(optimize::<G>(expr)), true),
         OptimizedExpr::Range(a, b) => {
             if a.len() == 1 && b.len() == 1 {
                 let a = a.chars().next().unwrap() as u8;
                 let b = b.chars().next().unwrap() as u8;
-                FPestExpr::CharacterCondition(format!("(c >= &{a:?} && c <= &{b:?})"))
+                FPestExpr::CharacterCondition(G::character_range(a, b))
             } else {
                 todo!()
             }

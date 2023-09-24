@@ -1,16 +1,5 @@
 use crate::{*, optimizer::FPestExpr};
 
-pub const CONDITIONS: &[(&str, &str)] = &[
-    ("ASCII_DIGIT", "c.is_ascii_digit()"),
-    ("ASCII_NONZERO_DIGIT", "(c.is_ascii_digit() && c != '0')"),
-    ("ASCII_ALPHA_LOWER", "c.is_ascii_lowercase()"),
-    ("ASCII_ALPHA_UPPER", "c.is_ascii_uppercase()"),
-    ("ASCII_ALPHA", "c.is_ascii_alphabetic()"),
-    ("ASCII_ALPHANUMERIC", "c.is_ascii_alphanumeric()"),
-    ("ASCII", "c.is_ascii()"),
-    ("ANY", "true"),
-];
-
 fn to_pest(expr: &FPestExpr) -> String {
     match expr {
         FPestExpr::Str(s) => format!("{s:?}"),
@@ -26,75 +15,21 @@ fn to_pest(expr: &FPestExpr) -> String {
     }
 }
 
-pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
+pub fn code<G: Generator>(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> String {
     let id = ids.id(expr);
     let formatted_idents = match contains_idents(expr, has_whitespace) {
         true => "idents: &'b mut Vec<(Ident<'i>, usize)>",
         false => "",
     };
     let hr_expr = to_pest(expr);
-    let hr_expre = hr_expr.replace('\\', "\\\\").replace('\"', "\\\"");
     match expr {
         FPestExpr::Ident(ident) => {
-            match ident.as_str() {
-                "EOI" => {
-                    format!(r#"
-                    pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
-                        if input.is_empty() {{
-                            Ok(input)
-                        }} else {{
-                            Err(Error::new(ErrorKind::Expected("EOI"), unsafe{{std::str::from_utf8_unchecked(input)}}, "EOI"))
-                        }}
-                    }}
-                    pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
-                        if input.is_empty() {{
-                            Some(input)
-                        }} else {{
-                            None
-                        }}
-                    }}
-
-                    "#)
-                }
-                "SOI" => {
-                    format!(r#" // TODO
-                    pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
-                        Ok(input)
-                    }}
-                    pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
-                        Some(input)
-                    }}
-
-                    "#)
-                }
-                "NEWLINE" => {
-                    format!(r#"
-                    pub fn parse_{id}<'i>(input: &'i [u8]) -> Result<&'i [u8], Error> {{
-                        if input.starts_with(b"\r\n") {{
-                            Ok(unsafe {{ input.get_unchecked(2..) }})
-                        }} else if input.starts_with(b"\n") || input.starts_with(b"\r") {{
-                            Ok(unsafe {{ input.get_unchecked(1..) }})
-                        }} else {{
-                            Err(Error::new(ErrorKind::Expected("newline"), unsafe{{std::str::from_utf8_unchecked(input)}}, "NEWLINE"))
-                        }}
-                    }}
-                    pub fn quick_parse_{id}<'i>(input: &'i [u8]) -> Option<&'i [u8]> {{
-                        if input.starts_with(b"\r\n") {{
-                            Some(unsafe {{ input.get_unchecked(2..) }})
-                        }} else if input.starts_with(b"\n") || input.starts_with(b"\r") {{
-                            Some(unsafe {{ input.get_unchecked(1..) }})
-                        }} else {{
-                            None
-                        }}
-                    }}
-
-                    "#)
-                }
-                _ => String::new()
-            }
-        }
+            let mut code = G::ident(ident);
+            code = code.replace("expr_id", &id);
+            code
+        },
         FPestExpr::CharacterCondition(condition) => {
-            let mut code = include_str!("pattern_expr_character.rs").to_owned();
+            let mut code = G::pattern_expr_character().to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
@@ -102,7 +37,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::Choice(items) => {
-            let mut code = include_str!("pattern_expr_choice.rs").to_owned();
+            let mut code = G::pattern_expr_choice().to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
@@ -118,14 +53,14 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::Str(value) => {
-            let mut code = include_str!("pattern_expr_str.rs").to_owned();
+            let mut code = G::pattern_expr_str().to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("expr_str", format!("{value:?}").as_str());
             code
         }
         FPestExpr::Seq(items) => {
-            let mut code = include_str!("pattern_expr_seq.rs").to_owned();
+            let mut code = G::pattern_expr_seq().to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
@@ -146,7 +81,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
         }
         FPestExpr::Rep(expr, empty_accepted) => {
             if let FPestExpr::CharacterCondition(condition) = &**expr {
-                let mut code = include_str!("pattern_expr_rep_character.rs").to_owned();
+                let mut code = G::pattern_expr_rep_character().to_owned();
                 code = code.replace("expr_id", &id);
                 code = code.replace("expr_pest", &hr_expr);
                 code = code.replace("formatted_idents", formatted_idents);
@@ -157,7 +92,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 return code
             }
 
-            let mut code = include_str!("pattern_expr_rep.rs").to_owned();
+            let mut code = G::pattern_expr_rep().to_owned();
             code = code.replace("expr_id", &id);
             code = code.replace("expr_pest", &hr_expr);
             code = code.replace("formatted_idents", formatted_idents);
@@ -176,7 +111,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             return code;
         }
         FPestExpr::Opt(expr) => {
-            let code = include_str!("pattern_expr_opt.rs").to_owned();
+            let code = G::pattern_expr_opt().to_owned();
             let code = code.replace("expr_id", &id);
             let code = code.replace("expr_pest", &hr_expr);
             let code = code.replace("formatted_idents", formatted_idents);
@@ -188,7 +123,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::NegPred(expr) => {
-            let code = include_str!("pattern_expr_neg.rs").to_owned();
+            let code = G::pattern_expr_neg().to_owned();
             let code = code.replace("expr_id", &id);
             let code = code.replace("expr_pest", &hr_expr);
             let code = code.replace("formatted_idents", formatted_idents);
@@ -208,7 +143,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 }
             }).collect::<String>();
 
-            let code = include_str!("pattern_expr_insens.rs").to_owned();
+            let code = G::pattern_expr_insens().to_owned();
             let code = code.replace("expr_id", &id);
             let code = code.replace("expr_pest", &hr_expr);
             let code = code.replace("expr_str", format!("{value:?}").as_str());

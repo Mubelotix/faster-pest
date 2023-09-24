@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "faster-pest",
-    "faster-pest-derive"
+    "faster-pest-generator",
+    "faster-pest-derive",
 ]
