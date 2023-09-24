@@ -199,7 +199,7 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             let code = code.replace("expr_id", &id);
             let code = code.replace("expr_pest", &hr_expr);
             let code = code.replace("formatted_idents", formatted_idents);
-            let code = code.replace("inner_id", &ids.id(expr));
+            let code = code.replace("inner_eid", &ids.id(expr));
             let code = code.replace("inner_idents", match contains_idents(expr, has_whitespace) {
                 true => "idents",
                 false => "",
