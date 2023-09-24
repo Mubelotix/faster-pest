@@ -146,23 +146,17 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
         }
         FPestExpr::Rep(expr, empty_accepted) => {
             if let FPestExpr::CharacterCondition(condition) = &**expr {
-                if *empty_accepted {
-                    let mut code = include_str!("pattern_expr_character_star.rs").to_owned();
-                    code = code.replace("expr_id", &id);
-                    code = code.replace("expr_pest", &hr_expr);
-                    code = code.replace("formatted_idents", formatted_idents);
-                    code = code.replace("character_condition", condition);
-                    return code
-                } else {
-                    let mut code = include_str!("pattern_expr_character_plus.rs").to_owned();
-                    code = code.replace("expr_id", &id);
-                    code = code.replace("expr_pest", &hr_expr);
-                    code = code.replace("formatted_idents", formatted_idents);
-                    code = code.replace("character_condition", condition);
-                    return code
+                let mut code = include_str!("pattern_expr_rep_character.rs").to_owned();
+                code = code.replace("expr_id", &id);
+                code = code.replace("expr_pest", &hr_expr);
+                code = code.replace("formatted_idents", formatted_idents);
+                code = code.replace("character_condition", condition);
+                if !empty_accepted {
+                    code = code.replace("//NON-EMPTY", "");
                 }
+                return code
             }
-
+            
             let expr_id = ids.id(expr);
             let idents = match contains_idents(expr, has_whitespace) {
                 true => "idents",
