@@ -156,43 +156,24 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
                 }
                 return code
             }
-            
-            let expr_id = ids.id(expr);
-            let idents = match contains_idents(expr, has_whitespace) {
+
+            let mut code = include_str!("pattern_expr_rep.rs").to_owned();
+            code = code.replace("expr_id", &id);
+            code = code.replace("expr_pest", &hr_expr);
+            code = code.replace("formatted_idents", formatted_idents);
+            code = code.replace("inner_eid", &ids.id(expr));
+            code = code.replace("inner_idents", match contains_idents(expr, has_whitespace) {
                 true => "idents",
                 false => "",
-            };
+            });
 
-            let (whitespace, quick_whitespace) = match has_whitespace {
-                true => ("while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }", "while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }"),
-                false => ("", ""),
-            };
-
-            let (non_empty, quick_non_empty) = match empty_accepted {
-                false => (format!("input = parse_{expr_id}(input, {idents})?;"), format!("input = quick_parse_{expr_id}(input, {idents})?;")),
-                true => (String::new(), String::new()),
-            };
-
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-                {non_empty}
-                while let Ok(new_input) = parse_{expr_id}(input, {idents}) {{
-                    input = new_input;
-                    {whitespace}
-                }}
-                Ok(input)
-            }}
-            pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-                {quick_non_empty}
-                while let Some(new_input) = quick_parse_{expr_id}(input, {idents}) {{
-                    input = new_input;
-                    {quick_whitespace}
-                }}
-                Some(input)
-            }}
-
-            "#)
+            if has_whitespace {
+                code = code.replace("//WSP", "");
+            }
+            if !empty_accepted {
+                code = code.replace("//NON-EMPTY", "");
+            }
+            return code;
         }
         FPestExpr::Opt(expr) => {
             let code = include_str!("pattern_expr_opt.rs").to_owned();
