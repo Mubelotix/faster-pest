@@ -32,10 +32,6 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
         true => "idents: &'b mut Vec<(Ident<'i>, usize)>",
         false => "",
     };
-    let (cancel1, cancel2, idents) = match contains_idents(expr, has_whitespace) {
-        true => ("let idents_len = idents.len();", "unsafe { idents.set_len(idents_len); }", "idents"),
-        false => ("", "", ""),
-    };
     let hr_expr = to_pest(expr);
     let hr_expre = hr_expr.replace('\\', "\\\\").replace('\"', "\\\"");
     match expr {
@@ -150,47 +146,24 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
             code
         }
         FPestExpr::Seq(items) => {
-            let mut code = String::new();
-            let mut note_for_next = String::new();
-            let mut quick_code = String::new();
-            for (i, item) in items.iter().enumerate() {
-                let bid = ids.id(item);
-                let idents = match contains_idents(item, has_whitespace) {
-                    true => "idents",
-                    false => "",
-                };
-                code.push_str(&format!("    input = parse_{bid}(input, {idents}).map_err(|e| e.with_trace(\"{id}-{i} {hr_expre}\"){note_for_next})?;\n"));
-                quick_code.push_str(&format!("    input = quick_parse_{bid}(input, {idents})?;\n"));
-                if has_whitespace {
-                    code.push_str("    while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }\n");
-                    quick_code.push_str("    while let Some(new_input) = quick_parse_WHITESPACE(input, idents) { input = new_input }\n");
-                }
-                match item {
-                    FPestExpr::Rep(rep, _) => {
-                        let id = ids.id(rep);
-                        let hr_rep = to_pest(rep);
-                        let hr_repe = hr_rep.replace('\\', "\\\\").replace('"', "\\\"");
-                        note_for_next = format!(".with_note(\"following sequence {id} {hr_repe}* which ended\")");
-                    }
-                    FPestExpr::Ident(i) if !CONDITIONS.iter().any(|(n,_)| n==i) => {
-                        note_for_next = format!(".with_note(\"following {i} which ended\")"); // TODO: display if it contains a sequence
-                    }
-                    _ => note_for_next.clear(),
-                }
+            let mut code = include_str!("pattern_expr_choice.rs").to_owned();
+            code = code.replace("expr_id", &id);
+            code = code.replace("expr_pest", &hr_expr);
+            code = code.replace("formatted_idents", formatted_idents);
+            code = multi_replace(code, vec![
+                ("seq_item_id", items.iter().map(|item| ids.id(item)).collect::<Vec<_>>()),
+                ("seq_idents", items.iter().map(|item| {
+                    match contains_idents(item, has_whitespace) {
+                        true => "idents",
+                        false => "",
+                    }.to_string()
+                }).collect::<Vec<_>>()),
+                ("seq_i", (0..items.len()).map(|i| i.to_string()).collect::<Vec<_>>()),
+            ]);
+            if has_whitespace {
+                code = code.replace("//WSP", " ");
             }
-
-            format!(r#"
-            // {hr_expr}
-            pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-            {code}
-                Ok(input)
-            }}
-            pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-            {quick_code}
-                Some(input)
-            }}
-            
-            "#)
+            code
         }
         FPestExpr::Rep(expr, empty_accepted) => {
             if let FPestExpr::CharacterCondition(condition) = &**expr {
