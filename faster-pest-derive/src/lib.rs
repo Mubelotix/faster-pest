@@ -92,7 +92,9 @@ fn get_all_rules(grammar_files: &[String]) -> Vec<OptimizedRule> {
         }
     }
 
-    rules.into_values().collect()
+    let mut rules: Vec<OptimizedRule> = rules.into_values().collect();
+    rules.sort_by_key(|rule| rule.name.clone());
+    rules
 }
 
 #[proc_macro_derive(Parser, attributes(grammar))]
