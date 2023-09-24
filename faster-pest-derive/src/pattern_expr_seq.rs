@@ -3,7 +3,7 @@ pub fn parse_expr_id<'i, 'b>(mut input: &'i [u8], formatted_idents) -> Result<&'
     
     // TODO note
 
-    input = parse_seq_item_id(input, seq_idents).map_err(|e| e.with_trace("expr_id-seq_n expr_pest"))?; //WSP while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }
+    input = parse_seq_item_id(input, seq_idents).map_err(|e| e.with_trace(r#"expr_id-seq_n expr_pest"#))?; //WSP while let Ok(new_input) = parse_WHITESPACE(input, idents) { input = new_input }
 
     Ok(input)
 }
