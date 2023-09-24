@@ -147,37 +147,19 @@ pub fn code(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace: bool) -> Str
         FPestExpr::Rep(expr, empty_accepted) => {
             if let FPestExpr::CharacterCondition(condition) = &**expr {
                 if *empty_accepted {
-                    return format!(r#"
-                    // {hr_expr}
-                    pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
-                        Ok(unsafe {{ input.get_unchecked(i..) }})
-                    }}
-                    pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
-                        Some(unsafe {{ input.get_unchecked(i..) }})
-                    }}
-                        
-                    "#);
+                    let mut code = include_str!("pattern_expr_character_star.rs").to_owned();
+                    code = code.replace("expr_id", &id);
+                    code = code.replace("expr_pest", &hr_expr);
+                    code = code.replace("formatted_idents", formatted_idents);
+                    code = code.replace("character_condition", condition);
+                    return code
                 } else {
-                    return format!(r#"
-                    // {hr_expr}
-                    pub fn parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Result<&'i [u8], Error> {{
-                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
-                        if i == 0 {{
-                            return Err(Error::new(ErrorKind::Expected("{condition}"), unsafe{{std::str::from_utf8_unchecked(input)}}, "{id} ({condition})+"));
-                        }}
-                        Ok(unsafe {{ input.get_unchecked(i..) }})
-                    }}
-                    pub fn quick_parse_{id}<'i, 'b>(mut input: &'i [u8], {formatted_idents}) -> Option<&'i [u8]> {{
-                        let i = input.iter().position(|c| !({condition})).unwrap_or(input.len());
-                        if i == 0 {{
-                            return None;
-                        }}
-                        Some(unsafe {{ input.get_unchecked(i..) }})
-                    }}
-                    
-                    "#);
+                    let mut code = include_str!("pattern_expr_character_plus.rs").to_owned();
+                    code = code.replace("expr_id", &id);
+                    code = code.replace("expr_pest", &hr_expr);
+                    code = code.replace("formatted_idents", formatted_idents);
+                    code = code.replace("character_condition", condition);
+                    return code
                 }
             }
 
