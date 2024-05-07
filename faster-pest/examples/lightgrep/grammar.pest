@@ -1,0 +1,21 @@
+caractere = { 'a'..'z' | 'A'..'Z' | '0'..'9' | "!" | "\"" | "#" | "%" | "&" | "," | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "^" | "_" | "`" | "{" | " | " | "}" | "~" }
+caractere_echape = { "|" | "$" | "(" | ")" | "[" | "]" | "*" | "?" | "." | "-" }
+joker = { "." }
+
+er = { erc ~ ("|" ~ erc)* }
+erc = { erb+ }
+erb = { ere ~ ere_rep? }
+ere = _{
+    ("(" ~ er ~ ")") |
+    lettre |
+    joker |
+    ("[" ~ ens_lettre ~ "]") |
+    ("[" ~ "^" ~ ens_lettre ~ "]")
+}
+ere_rep = { "*" | "?" | "+" }
+
+ens_lettre = { element_ens_lettre+ }
+element_ens_lettre = { (lettre ~ "-" ~ lettre) | lettre }
+lettre = _{ caractere | ("\\" ~ caractere_echape) }
+
+file = { SOI ~ er ~ ("\n")* ~ EOI }
