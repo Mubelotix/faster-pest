@@ -26,7 +26,7 @@ pub enum ExpressionRationnelle {
 // TODO: Investigate: EOI didn't work well
 
 impl ExpressionRationnelle {
-    fn from_ident_ref(value: IdentRef<Ident>) -> Self {
+    pub fn from_ident_ref(value: IdentRef<Ident>) -> Self {
         match value.as_rule() {
             Rule::er => {
                 let mut children: Vec<_> = value.children().map(ExpressionRationnelle::from_ident_ref).collect();
