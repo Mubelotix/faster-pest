@@ -76,19 +76,11 @@ pub fn code<G: Generator>(expr: &FPestExpr, ids: &mut IdRegistry, has_whitespace
         FPestExpr::Opt(expr) => {
             let code = G::pattern_expr_opt().to_owned();
             let code = code.replace("inner_eid", &ids.id(expr));
-            let code = code.replace("inner_idents", match contains_idents(expr, has_whitespace) {
-                true => "idents",
-                false => "",
-            });
             code
         }
         FPestExpr::NegPred(expr) => {
             let code = G::pattern_expr_neg().to_owned();
             let code = code.replace("inner_id", &ids.id(expr));
-            let code = code.replace("inner_idents", match contains_idents(expr, has_whitespace) {
-                true => "idents",
-                false => "",
-            });
             code
         }
         FPestExpr::Insens(value) => {
