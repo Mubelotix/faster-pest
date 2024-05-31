@@ -81,7 +81,7 @@ mod faster_pest_json {
         fn from_ident_ref(value: IdentRef<'i, Ident>) -> Self {
             match value.as_rule() {
                 Rule::string => Value::String(unescape(value)),
-                Rule::number => Value::Number(value.as_str().parse().unwrap()),
+                Rule::number => Value::Number(value.as_str().parse().expect("number")),
                 Rule::boolean => Value::Boolean(value.as_str() == "true"),
                 Rule::array => {
                     let mut array = Vec::new();
@@ -92,9 +92,9 @@ mod faster_pest_json {
                     let mut object = BTreeMap::new();
                     for property in value.children() {
                         let mut property_children = property.children();
-                        let name = property_children.next().unwrap();
+                        let name = property_children.next().expect("name");
                         let name = unescape(name);
-                        let value = property_children.next().unwrap();
+                        let value = property_children.next().expect("value");
                         object.insert(name, Value::from_ident_ref(value));
                     }
                     Value::Object(object)
@@ -169,9 +169,9 @@ mod faster_pest_json {
         };
 
         b.iter(|| black_box({
-            let output = JsonParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).unwrap();
-            let file = output.into_iter().next().unwrap();
-            let main_object = file.children().next().unwrap();
+            let output = JsonParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).expect("unsuccessful parse");
+            let file = output.into_iter().next().expect("couldn't find file rule");
+            let main_object = file.children().next().expect("couldn't find main object");
             let output = Value::from_ident_ref(main_object);
         }));
     }
@@ -191,7 +191,7 @@ mod serde {
         };
 
         b.iter(|| black_box({
-            serde_json::from_str::<serde_json::Value>(&unparsed_file).unwrap()
+            serde_json::from_str::<serde_json::Value>(&unparsed_file).expect("unsuccessful parse");
         }));
     }
 }

@@ -70,7 +70,7 @@ pub fn optimize<G: Generator>(expr: &OptimizedExpr) -> FPestExpr {
             }
 
             if items.len() == 1 {
-                items.pop().unwrap()
+                items.pop().expect("Seq")
             } else {
                 FPestExpr::Seq(items)
             }
@@ -102,7 +102,7 @@ pub fn optimize<G: Generator>(expr: &OptimizedExpr) -> FPestExpr {
             }
 
             if fp_choices.len() == 1 {
-                fp_choices.pop().unwrap()
+                fp_choices.pop().expect("Choice")
             } else {
                 FPestExpr::Choice(fp_choices)
             }
@@ -111,8 +111,8 @@ pub fn optimize<G: Generator>(expr: &OptimizedExpr) -> FPestExpr {
         OptimizedExpr::Rep(expr) => FPestExpr::Rep(Box::new(optimize::<G>(expr)), true),
         OptimizedExpr::Range(a, b) => {
             if a.len() == 1 && b.len() == 1 {
-                let a = a.chars().next().unwrap() as u8;
-                let b = b.chars().next().unwrap() as u8;
+                let a = a.chars().next().expect("Range a").to_ascii_lowercase() as u8;
+                let b = b.chars().next().expect("Range b").to_ascii_lowercase() as u8;
                 FPestExpr::CharacterCondition(G::character_range(a, b))
             } else {
                 todo!()
@@ -163,7 +163,7 @@ pub fn optimize_second_stage(expr: &mut FPestExpr, character_set_rules: &HashMap
             }
 
             if items.len() == 1 {
-                *expr = items.pop().unwrap();
+                *expr = items.pop().expect("Seq")
             }
         },
         FPestExpr::Choice(items) => {
@@ -190,7 +190,7 @@ pub fn optimize_second_stage(expr: &mut FPestExpr, character_set_rules: &HashMap
             }
 
             if fp_choices.len() == 1 {
-                *expr = fp_choices.pop().unwrap()
+                *expr = fp_choices.pop().expect("Choice")
             } else {
                 *expr = FPestExpr::Choice(fp_choices);
             }

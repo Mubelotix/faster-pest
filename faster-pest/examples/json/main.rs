@@ -19,7 +19,7 @@ impl<'i> Value<'i> {
     fn from_ident_ref(value: IdentRef<'i, Ident>) -> Self {
         match value.as_rule() {
             Rule::string => Value::String(unescape(value)),
-            Rule::number => Value::Number(value.as_str().parse().unwrap()),
+            Rule::number => Value::Number(value.as_str().parse().expect("number")),
             Rule::boolean => Value::Boolean(value.as_str() == "true"),
             Rule::array => {
                 let mut array = Vec::new();
@@ -30,9 +30,9 @@ impl<'i> Value<'i> {
                 let mut object = HashMap::new();
                 for property in value.children() {
                     let mut property_children = property.children();
-                    let name = property_children.next().unwrap();
+                    let name = property_children.next().expect("name");
                     let name = unescape(name);
-                    let value = property_children.next().unwrap();
+                    let value = property_children.next().expect("value");
                     object.insert(name, Value::from_ident_ref(value));
                 }
                 Value::Object(object)
@@ -84,9 +84,9 @@ fn main() {
         }
     };
 
-    let output = JsonParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).unwrap();
-    let file = output.into_iter().next().unwrap();
-    let main_object = file.children().next().unwrap();
+    let output = JsonParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).expect("unsuccessful parse");
+    let file = output.into_iter().next().expect("couldn't find file rule");
+    let main_object = file.children().next().expect("couldn't find main object");
     let output = Value::from_ident_ref(main_object);
     println!("{:#?}", output);
 }

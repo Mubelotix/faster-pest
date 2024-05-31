@@ -14,8 +14,8 @@ fn main() {
         }
     };
 
-    let output = POParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).unwrap();
-    let file = output.into_iter().next().unwrap(); // get and unwrap the `file` rule; never fails
+    let output = POParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).expect("unsuccessful parse");
+    let file = output.into_iter().next().expect("couldn't find file rule");
 
     for line in file.children() {
         match line.as_rule() {

@@ -16,8 +16,9 @@ fn main() {
     };
     
     let file = CSVParser::parse(Rule::file, &unparsed_file)
-        .expect("unsuccessful parse") // unwrap the parse result
-        .next().unwrap(); // get and unwrap the `file` rule; never fails
+        .expect("unsuccessful parse")
+        .next()
+        .expect("couldn't find file rule");
 
     let mut field_sum: f64 = 0.0;
     let mut record_count: u64 = 0;
@@ -28,7 +29,7 @@ fn main() {
                 record_count += 1;
 
                 for field in record.into_inner() {
-                    field_sum += field.as_str().parse::<f64>().unwrap();
+                    field_sum += field.as_str().parse::<f64>().expect("field should be a number")
                 }
             }
             // TODO Rule::EOI => (),

@@ -44,10 +44,10 @@ impl ExpressionRationnelle {
             }
             Rule::erb => {
                 let mut children = value.children();
-                let ere = children.next().unwrap();
+                let ere = children.next().expect("ere");
                 let ere = match ere.as_rule() {
                     Rule::er => ExpressionRationnelle::from_ident_ref(ere),
-                    Rule::caractere | Rule::caractere_echape  => ExpressionRationnelle::Lettre(ere.as_str().chars().next().unwrap()),
+                    Rule::caractere | Rule::caractere_echape  => ExpressionRationnelle::Lettre(ere.as_str().chars().next().expect("caractere")),
                     Rule::joker => ExpressionRationnelle::Joker,
                     Rule::ens_lettre => ExpressionRationnelle::from_ident_ref(ere),
                     any => panic!("Unknown rule in ere: {:?}", any),
@@ -70,17 +70,17 @@ impl ExpressionRationnelle {
                 for element_ens_lettre in value.children() {
                     debug_assert!(element_ens_lettre.as_rule() == Rule::element_ens_lettre);
                     let mut children = element_ens_lettre.children();
-                    let first = children.next().unwrap();
+                    let first = children.next().expect("first");
                     match children.next() {
                         Some(second) => {
-                            let first = first.as_str().chars().next().unwrap();
-                            let second = second.as_str().chars().next().unwrap();
+                            let first = first.as_str().chars().next().expect("first");
+                            let second = second.as_str().chars().next().expect("second");
                             for c in first..=second {
                                 lettres.insert(c);
                             }
                         }
                         None => {
-                            let c = first.as_str().chars().next().unwrap();
+                            let c = first.as_str().chars().next().expect("c");
                             lettres.insert(c);
                         }
                     }
@@ -101,9 +101,9 @@ fn main() {
         }
     };
 
-    let output = LightgrepParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).unwrap();
-    let file = output.into_iter().next().unwrap();
-    let main_object = file.children().next().unwrap();
+    let output = LightgrepParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).expect("unsuccessful parse");
+    let file = output.into_iter().next().expect("couldn't find file rule");
+    let main_object = file.children().next().expect("couldn't find main object");
     println!("{:#?}", main_object);
 
     let output = ExpressionRationnelle::from_ident_ref(main_object);

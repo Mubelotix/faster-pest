@@ -37,9 +37,9 @@ fn lightgrep_to_rust(b: &mut Bencher) {
     };
 
     b.iter(|| black_box({
-        let output = LightgrepParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).unwrap();
-        let file = output.into_iter().next().unwrap();
-        let main_object = file.children().next().unwrap();    
+        let output = LightgrepParser::parse_file(&unparsed_file).map_err(|e| e.print(unparsed_file.as_str())).expect("unsuccessful parse");
+        let file = output.into_iter().next().expect("couldn't find file rule");
+        let main_object = file.children().next().expect("couldn't find main object");
         let output = ExpressionRationnelle::from_ident_ref(main_object);
     }));
 }

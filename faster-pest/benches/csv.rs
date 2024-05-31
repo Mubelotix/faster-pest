@@ -28,7 +28,8 @@ mod pest_classic {
         b.iter(|| black_box({
             let file = CSVParser::parse(Rule::file, &unparsed_file)
                 .expect("unsuccessful parse")
-                .next().unwrap();
+                .next()
+                .expect("couldn't find file rule");
 
             let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
@@ -39,7 +40,7 @@ mod pest_classic {
                         record_count += 1;
 
                         for field in record.into_inner() {
-                            field_sum += field.as_str().parse::<f64>().unwrap();
+                            field_sum += field.as_str().parse::<f64>().expect("field should be a number")
                         }
                     }
                     // TODO Rule::EOI => (),
@@ -75,7 +76,7 @@ mod faster_pest {
 
         b.iter(|| black_box({
             let file = CSVParser::parse_file(&unparsed_file).expect("unsuccessful parse");
-            let file = file.into_iter().next().unwrap();
+            let file = file.into_iter().next().expect("couldn't find file rule");
 
             let mut field_sum: f64 = 0.0;
             let mut record_count: u64 = 0;
@@ -86,7 +87,7 @@ mod faster_pest {
                         record_count += 1;
 
                         for field in record.children() {
-                            field_sum += field.as_str().parse::<f64>().unwrap();
+                            field_sum += field.as_str().parse::<f64>().expect("field should be a number")
                         }
                     }
                     // TODO Rule::EOI => (),

@@ -79,7 +79,7 @@ impl Error {
             pest::error::ErrorVariant::CustomError {
                 message: format!("{}", self.kind),
             },
-            pest::Position::new(input, input.len() - self.remaining_bytes).unwrap()
+            pest::Position::new(input, input.len() - self.remaining_bytes).expect("Error::into_pest: invalid position"),
         )
     }
 }

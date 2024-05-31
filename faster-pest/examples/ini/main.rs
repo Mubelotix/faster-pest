@@ -16,7 +16,8 @@ fn main() {
 
     let file = INIParser::parse(Rule::file, &unparsed_file)
         .expect("unsuccessful parse")
-        .next().unwrap(); // get and unwrap the `file` rule; never fails
+        .next()
+        .expect("couldn't find file rule");
 
     let mut properties: HashMap<&str, HashMap<&str, &str>> = HashMap::new();
 
@@ -26,13 +27,13 @@ fn main() {
         match line.as_rule() {
             Rule::section => {
                 let mut inner_rules = line.into_inner(); // { name }
-                current_section_name = inner_rules.next().unwrap().as_str();
+                current_section_name = inner_rules.next().expect("section name").as_str();
             }
             Rule::property => {
                 let mut inner_rules = line.into_inner(); // { name ~ "=" ~ value }
 
-                let name: &str = inner_rules.next().unwrap().as_str();
-                let value: &str = inner_rules.next().unwrap().as_str();
+                let name: &str = inner_rules.next().expect("property name").as_str();
+                let value: &str = inner_rules.next().expect("property value").as_str();
 
                 // Insert an empty inner hash map if the outer hash map hasn't
                 // seen this section name before.

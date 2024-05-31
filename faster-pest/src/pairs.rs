@@ -46,7 +46,7 @@ impl<'i, I: IdentTrait> Pair2<'i, I> {
     pub fn as_span(&self) -> Span<'i> {
         let start = self.as_str().as_ptr() as usize - self.original_input.as_ptr() as usize;
         let end = start + self.as_str().len();
-        Span::new(self.original_input, start, end).unwrap()
+        Span::new(self.original_input, start, end).expect("Pair2::as_span: invalid span")
     }
 
     pub fn inner(&self) -> Pairs2<'i, I> {

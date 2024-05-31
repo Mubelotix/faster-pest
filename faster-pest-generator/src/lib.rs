@@ -110,7 +110,12 @@ pub fn gen<G: Generator>(struct_ident: String, grammar_files: Vec<String>) -> St
         ("RuleVariant", rules.iter().filter(|r| !silent_rules.contains(&r.name.as_str())).map(|rule| rule.name.as_str().to_string()).collect()),
         ("IdentVariant", rules.iter().filter(|r| !silent_rules.contains(&r.name.as_str())).map(|rule| {
             let name = rule.name.as_str();
-            let name_pascal_case = name.chars().next().unwrap().to_uppercase().collect::<String>() + &name[1..];
+            let name_pascal_case = name.chars()
+                .next()
+                .expect("Rule name must not be empty")
+                .to_uppercase()
+                .collect::<String>()
+                + &name[1..];
             name_pascal_case
         }).collect()),
     ]);
@@ -135,10 +140,15 @@ pub fn gen<G: Generator>(struct_ident: String, grammar_files: Vec<String>) -> St
     println!("{:#?}", optimized_exprs);
     let mut inner_code = String::new();
     for (i, rule) in rules.iter().enumerate() {
-        let expr = optimized_exprs.get(i).unwrap();
+        let expr = optimized_exprs.get(i).expect("Expr not found");
         exprs.extend(list_exprs(expr));
         let rule_name = rule.name.as_str();
-        let rule_name_pascal_case = rule_name.chars().next().unwrap().to_uppercase().collect::<String>() + &rule_name[1..];
+        let rule_name_pascal_case = rule_name.chars()
+            .next()
+            .expect("Rule name must not be empty")
+            .to_uppercase()
+            .collect::<String>()
+            + &rule_name[1..];
         let top_expr_id = ids.id(expr);
         let formatted_idents = match contains_idents(expr, has_whitespace) {
             true => "idents",
@@ -170,7 +180,6 @@ pub fn gen<G: Generator>(struct_ident: String, grammar_files: Vec<String>) -> St
         inner_code.push_str(new_code.as_str());
     }
     full_code = full_code.replace("    // inner code", inner_code.as_str());
-    std::fs::write("target/fp_code.rs", &full_code).unwrap();
     
-    full_code.parse().unwrap()
+    full_code.parse().expect("Unable to parse code")
 }

@@ -166,7 +166,10 @@ pub fn derive_parser(input: TokenStream) -> TokenStream {
 
     let code = faster_pest_generator::gen::<RustGenerator>(struct_ident.to_string(), grammar_files);
 
-    std::fs::write("target/fp_code.rs", &code).unwrap();
+    let r = std::fs::write("target/fp_code.rs", &code);
+    if let Err(e) = r {
+        eprintln!("Unable to write code to target/fp_code.rs: {e}");
+    }
     
-    code.parse().unwrap()
+    code.parse().expect("Unable to parse code")
 }
